@@ -1,0 +1,146 @@
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grand Oral Finder</title>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // Récupérer les valeurs de localStorage
+            var spec1 = localStorage.getItem("specialite1");
+            var spec2 = localStorage.getItem("specialite2");
+            var numero_commission = localStorage.getItem("numero_commission");
+            var date = localStorage.getItem("date");
+            var contact = localStorage.getItem("contact");
+
+            // Réinsérer les valeurs dans les champs du formulaire
+            document.getElementById("spécialitée1").value = spec1;
+            document.getElementById("spécialitée2").value = spec2;
+            document.getElementById("numéro_de_commission").value = numero_commission;
+            document.getElementById("date").value = date;
+            document.getElementById("contact").value = contact;
+        });
+        function validateForm() {
+            var spec1 = document.getElementById("spécialitée1").value;
+            var spec2 = document.getElementById("spécialitée2").value;
+            var numero_commission = document.getElementById("numéro_de_commission").value;
+            var date = document.getElementById("date").value;
+            var contact = document.getElementById("contact").value;
+
+            if (spec1 === spec2) {
+                alert("Les deux spécialités doivent être différentes.");
+                return false;
+            }
+            // Vérifier si le numéro de commission fait exactement 4 chiffres
+            if (numero_commission.length !== 4) {
+                alert("Le numéro de commission doit contenir exactement 4 chiffres.");
+                return false;
+            }
+
+            //filtrer le contact pour éviter les injections
+            contact = contact.replace(/<[^>]*>?/gm, '');
+
+            localStorage.setItem("specialite1", spec1);
+            localStorage.setItem("specialite2", spec2);
+            localStorage.setItem("numero_commission", numero_commission);
+            localStorage.setItem("date", date);
+            localStorage.setItem("contact", contact);
+
+            return true;
+        }
+
+    </script>
+</head>
+
+<body>
+    <h1>Bienvenue sur Grand Oral Finder</h1>
+    <h2>Le site qui vous permet de savoir sur quel sujet de grand oral vous allez être interrogé</h2>
+    <p>Ce site se base sur le numéro de commission inscrit sur votre convocation et recoupe les informations avec
+        d'autres personnes pour trouver la spécialité en commun et ainsi prédire sur quel sujet vous allez sûrement être
+        interrogé.</p>
+    <b>ATTENTION ! Ne pas prendre les informations données par ce site comme parole d'évangile, les informations saisies
+        par les utilisateurs peuvent être fausses, les jurys peuvent changer, peut-être que ces numéros ne veulent rien
+        dire et les professeurs sont libres de choisir le sujet qu'ils veulent même s'il ne correspond pas à leur
+        matière. Ce site ne vous aidera pas si vous avez des sujets transversaux. Il est conseillé de bien préparer les
+        deux sujets indépendamment des résultats du site. Je ne suis pas responsable des prédictions données. <br>
+        Merci.</b>
+    <br>
+    <br>
+    <p>Comment récupérer son numéro de commission ? Se connecter à son <a
+            href="https://cyclades.education.gouv.fr/cyccandidat/portal/login"> espace cyclades.</a> Cliquer sur la
+        session du bac 2024 puis sur mes documents et télécharger le PDF "Convocation (5 épreuves). Le numéro de
+        commission se trouve dans la section Grand oral en bas (voir image)</p>
+    <img style="height:400px" src="convoc.png">
+    <br>
+    <br>
+    <h2>Entrez les informations demandées pour connaître votre sujet de grand oral:</h2>
+    <form action="result.php" method="post" onsubmit="return validateForm()">
+        <label>Spécialitées de terminale (bac général uniquement, l'ordre n'a pas d'importance):</label>
+        <br>
+        <select id="spécialitée1" name="spécialitée1" required>
+            <option value="Mathématiques">Mathématiques</option>
+            <option value="Physique-Chimie">Physique-Chimie</option>
+            <option value="Sciences de la vie et de la Terre">Sciences de la vie et de la Terre</option>
+            <option value="Sciences de l'ingénieur">Sciences de l'ingénieur</option>
+            <option value="Numérique et sciences informatiques">Numérique et sciences informatiques</option>
+            <option value="Sciences économiques et sociales">Sciences économiques et sociales</option>
+            <option value="Histoire-Géographie, Géopolitique et Sciences politiques">Histoire-Géographie, Géopolitique
+                et Sciences politiques</option>
+            <option value="Humanités, littérature et philosophie">Humanités, littérature et philosophie</option>
+            <option value="Langues, littératures et cultures étrangères">Langues, littératures et cultures étrangères
+            </option>
+            <option value="Arts">Arts</option>
+            <option value="Littérature, langues et cultures de l'Antiquité">Littérature, langues et cultures de
+                l'Antiquité</option>
+            <option value="Sports: Education Physique, pratique et culture sportives">Sports: Education Physique,
+                pratique et culture sportives</option>
+            <option value="Ecologie, Agronomie et Territoires (lycée agricole uniquement)">Ecologie, Agronomie et
+                Territoires (lycée agricole uniquement)</option>
+        </select>
+        <select id="spécialitée2" name="spécialitée2" required>
+            <option value="Mathématiques">Mathématiques</option>
+            <option value="Physique-Chimie">Physique-Chimie</option>
+            <option value="Sciences de la vie et de la Terre">Sciences de la vie et de la Terre</option>
+            <option value="Sciences de l'ingénieur">Sciences de l'ingénieur</option>
+            <option value="Numérique et sciences informatiques">Numérique et sciences informatiques</option>
+            <option value="Sciences économiques et sociales">Sciences économiques et sociales</option>
+            <option value="Histoire-Géographie, Géopolitique et Sciences politiques">Histoire-Géographie, Géopolitique
+                et Sciences politiques</option>
+            <option value="Humanités, littérature et philosophie">Humanités, littérature et philosophie</option>
+            <option value="Langues, littératures et cultures étrangères">Langues, littératures et cultures étrangères
+            </option>
+            <option value="Arts">Arts</option>
+            <option value="Littérature, langues et cultures de l'Antiquité">Littérature, langues et cultures de
+                l'Antiquité</option>
+            <option value="Sports: Education Physique, pratique et culture sportives">Sports: Education Physique,
+                pratique et culture sportives</option>
+            <option value="Ecologie, Agronomie et Territoires (lycée agricole uniquement)">Ecologie, Agronomie et
+                Territoires (lycée agricole uniquement)</option>
+        </select>
+        <br><br>
+        <label for="numéro_de_commission">Numéro de commission (sans COM):</label>
+        <input type="number" id="numéro_de_commission" name="numéro_de_commission" required>
+        <br><br>
+        <label for="date">Date de passage METTRE LA BONNE HEURE PLUSIEURS PERSONNES ONT LAISSE L'HEURE PAR DEFAULT
+            !!!:</label>
+        <input type="datetime-local" id="date" name="date" required />
+        <br><br>
+        <label for="contact">Contact (pour mettre en relation les élèves pour plus de précisions) (ex: mail, instagram
+            etc) ET POUR QUE L'ADMIN PUISSE VOUS CONTACTER EN CAS DE PROBLEME/FORMULAIRE MAL REMPLI:</label>
+        <input type="text" id="contact" name="contact" required />
+        <br>
+        <br>
+        <input type="submit" value="Soumettre et Rechercher">
+        <br>
+
+    </form>
+    <h2>Si vous avez déjà entré vos informations et que vous voulez reconsulter les information à nouveau ne vous
+        inquiétez pas, recliquez juste sur Soumettre et rechercher, puique les informations seront les mêmes que celles
+        que vous aviez mises la première fois aucun doublon ne sera généré</h2>
+    <h3>NE FONCTIONNE CORRECTEMENT QUE POUR LE LYCEE AUX LAZARISTES (peut fonctionner pour les autres mais pas garanti)
+    </h3>
+    <h2>Site fait par Ferréol DUBOIS COLI. Si je vous contacte c'est que vous avez mal rempli le questionnaire (mon
+        insta fefe.dc_)</h2>
+</body>
+
+</html>
