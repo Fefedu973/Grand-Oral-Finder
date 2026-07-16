@@ -7,7 +7,9 @@ export default function DashboardPage() {
 				<p className="font-medium text-muted-foreground text-xs uppercase">
 					Accès local
 				</p>
-				<h1 className="mt-2 font-semibold text-3xl">Mes déclarations</h1>
+				<h1 className="mt-2 font-semibold text-3xl tracking-tight">
+					Mes déclarations
+				</h1>
 				<p className="mt-3 text-muted-foreground text-sm leading-6">
 					Les clés enregistrées dans ce navigateur donnent accès à vos
 					déclarations, sans compte ni email.

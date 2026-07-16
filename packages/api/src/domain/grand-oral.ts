@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const GENERAL_SPECIALTIES = [
 	"Arts",
-	"Écologie, agronomie et territoires",
+	"Biologie-écologie",
 	"Éducation physique, pratiques et culture sportives",
 	"Histoire-géographie, géopolitique et sciences politiques",
 	"Humanités, littérature et philosophie",
@@ -64,12 +64,34 @@ function hasDifferentSubjects(value: ContributionFields) {
 }
 
 function hasValidSeries(value: ContributionFields) {
+	if (value.track === "general") return value.series === "";
+	return TECHNOLOGICAL_SERIES.includes(
+		value.series as (typeof TECHNOLOGICAL_SERIES)[number],
+	);
+}
+
+function hasValidGeneralSubject(
+	value: ContributionFields,
+	field: "subjectOne" | "subjectTwo",
+) {
 	return (
-		value.track === "general" ||
-		TECHNOLOGICAL_SERIES.includes(
-			value.series as (typeof TECHNOLOGICAL_SERIES)[number],
+		value.track !== "general" ||
+		GENERAL_SPECIALTIES.includes(
+			value[field] as (typeof GENERAL_SPECIALTIES)[number],
 		)
 	);
+}
+
+function hasUsableCommissionCode(
+	value: Pick<z.infer<typeof contributionBaseSchema>, "commissionCode">,
+) {
+	return normalizeCommissionCode(value.commissionCode).length >= 2;
+}
+
+function hasMatchingExamDay(
+	value: Pick<z.infer<typeof contributionBaseSchema>, "examAt" | "examDay">,
+) {
+	return value.examAt.slice(0, 10) === value.examDay;
 }
 
 export const contributionInputSchema = contributionBaseSchema
@@ -77,9 +99,25 @@ export const contributionInputSchema = contributionBaseSchema
 		message: "Les deux sujets ou spécialités doivent être différents.",
 		path: ["subjectTwo"],
 	})
+	.refine((value) => hasValidGeneralSubject(value, "subjectOne"), {
+		message: "Sélectionnez une spécialité générale dans la liste.",
+		path: ["subjectOne"],
+	})
+	.refine((value) => hasValidGeneralSubject(value, "subjectTwo"), {
+		message: "Sélectionnez une spécialité générale dans la liste.",
+		path: ["subjectTwo"],
+	})
 	.refine(hasValidSeries, {
-		message: "Sélectionnez votre série technologique.",
+		message: "La série ne correspond pas à la voie sélectionnée.",
 		path: ["series"],
+	})
+	.refine(hasUsableCommissionCode, {
+		message: "Le code normalisé doit contenir au moins deux caractères.",
+		path: ["commissionCode"],
+	})
+	.refine(hasMatchingExamDay, {
+		message: "La date et l’heure de passage doivent désigner le même jour.",
+		path: ["examAt"],
 	});
 
 export const finderInputSchema = contributionBaseSchema
@@ -90,9 +128,21 @@ export const finderInputSchema = contributionBaseSchema
 		message: "Les deux sujets ou spécialités doivent être différents.",
 		path: ["subjectTwo"],
 	})
+	.refine((value) => hasValidGeneralSubject(value, "subjectOne"), {
+		message: "Sélectionnez une spécialité générale dans la liste.",
+		path: ["subjectOne"],
+	})
+	.refine((value) => hasValidGeneralSubject(value, "subjectTwo"), {
+		message: "Sélectionnez une spécialité générale dans la liste.",
+		path: ["subjectTwo"],
+	})
 	.refine(hasValidSeries, {
-		message: "Sélectionnez votre série technologique.",
+		message: "La série ne correspond pas à la voie sélectionnée.",
 		path: ["series"],
+	})
+	.refine(hasUsableCommissionCode, {
+		message: "Le code normalisé doit contenir au moins deux caractères.",
+		path: ["commissionCode"],
 	});
 
 export type ContributionInput = z.infer<typeof contributionInputSchema>;
@@ -103,6 +153,6 @@ export function normalizeCommissionCode(value: string) {
 		.normalize("NFKC")
 		.trim()
 		.toLocaleUpperCase("fr-FR")
-		.replace(/^COM[\s:._-]*/u, "")
+		.replace(/^COM(?=\d|[\s:._-])/u, "")
 		.replace(/[\s._-]+/g, "");
 }

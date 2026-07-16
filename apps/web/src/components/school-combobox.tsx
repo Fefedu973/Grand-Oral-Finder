@@ -1,25 +1,16 @@
 "use client";
 
-import { Button } from "@grand-oral-finder/ui/components/button";
 import {
-	Command,
-	CommandEmpty,
-	CommandInput,
-	CommandItem,
-	CommandList,
-} from "@grand-oral-finder/ui/components/command";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@grand-oral-finder/ui/components/popover";
+	Combobox,
+	ComboboxContent,
+	ComboboxEmpty,
+	ComboboxInput,
+	ComboboxItem,
+	ComboboxList,
+} from "@grand-oral-finder/ui/components/combobox";
+import { Spinner } from "@grand-oral-finder/ui/components/spinner";
 import { useQuery } from "@tanstack/react-query";
-import {
-	CheckIcon,
-	ChevronsUpDownIcon,
-	MapPinIcon,
-	SchoolIcon,
-} from "lucide-react";
+import { MapPinIcon, SchoolIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { orpc } from "@/utils/orpc";
@@ -35,7 +26,7 @@ export type SchoolOption = {
 
 type SchoolComboboxProps = {
 	value: SchoolOption | null;
-	onChange: (school: SchoolOption) => void;
+	onChange: (school: SchoolOption | null) => void;
 	invalid?: boolean;
 };
 
@@ -44,7 +35,6 @@ export function SchoolCombobox({
 	onChange,
 	invalid,
 }: SchoolComboboxProps) {
-	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
 	const normalizedQuery = query.trim();
 	const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -64,82 +54,67 @@ export function SchoolCombobox({
 		staleTime: 30 * 60 * 1000,
 	});
 
+	const searching = schools.isLoading || debouncedQuery !== normalizedQuery;
+
 	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger
-				render={
-					<Button
-						type="button"
-						variant="outline"
-						className="h-10 w-full justify-between rounded-md px-3 text-left font-normal text-sm"
-						aria-invalid={invalid}
-					/>
-				}
-			>
-				<span className="min-w-0 truncate">
-					{value
-						? `${value.name} · ${value.city}`
-						: "Rechercher un lycée ou une ville"}
-				</span>
-				<ChevronsUpDownIcon className="text-muted-foreground" />
-			</PopoverTrigger>
-			<PopoverContent
-				align="start"
-				className="w-[min(34rem,calc(100vw-2rem))] rounded-md p-0"
-			>
-				<Command shouldFilter={false}>
-					<CommandInput
-						value={query}
-						onValueChange={setQuery}
-						placeholder="Nom, ville ou code postal"
-					/>
-					<CommandList className="max-h-80">
-						{normalizedQuery.length < 2 ? (
-							<div className="px-3 py-8 text-center text-muted-foreground">
-								Saisissez au moins deux caractères.
-							</div>
-						) : schools.isLoading || debouncedQuery !== normalizedQuery ? (
-							<div className="px-3 py-8 text-center text-muted-foreground">
-								Recherche dans l’annuaire national…
-							</div>
-						) : schools.isError ? (
-							<div className="px-3 py-8 text-center text-destructive">
-								L’annuaire est momentanément indisponible. Réessayez dans un
-								instant.
-							</div>
-						) : (
-							<CommandEmpty>Aucun lycée trouvé.</CommandEmpty>
-						)}
-						{schools.data?.map((school) => (
-							<CommandItem
-								key={school.uai}
-								value={school.uai}
-								onSelect={() => {
-									onChange(school);
-									setOpen(false);
-								}}
-								className="items-start rounded-sm py-3"
-							>
-								<SchoolIcon className="mt-0.5 text-muted-foreground" />
-								<span className="min-w-0 flex-1">
-									<span className="block truncate font-medium">
-										{school.name}
-									</span>
-									<span className="mt-0.5 flex items-center gap-1 text-muted-foreground">
-										<MapPinIcon className="size-3" />
-										{school.city}
-										{school.postalCode ? ` · ${school.postalCode}` : ""}
-										{school.sector ? ` · ${school.sector}` : ""}
-									</span>
+		<Combobox
+			items={schools.data ?? []}
+			value={value}
+			onValueChange={(school) => onChange(school ?? null)}
+			filter={null}
+			itemToStringLabel={(school) =>
+				school ? `${school.name} · ${school.city}` : ""
+			}
+			isItemEqualToValue={(a, b) => a?.uai === b?.uai}
+			onInputValueChange={(nextValue, details) => {
+				if (details.reason === "item-press") return;
+				setQuery(nextValue);
+			}}
+		>
+			<ComboboxInput
+				placeholder="Rechercher un lycée ou une ville"
+				aria-invalid={invalid}
+				showClear
+			/>
+			<ComboboxContent>
+				{normalizedQuery.length < 2 ? (
+					<div className="px-3 py-8 text-center text-muted-foreground text-sm">
+						Saisissez au moins deux caractères.
+					</div>
+				) : searching ? (
+					<div className="flex items-center justify-center gap-2 px-3 py-8 text-muted-foreground text-sm">
+						<Spinner />
+						Recherche dans l’annuaire national…
+					</div>
+				) : schools.isError ? (
+					<div className="px-3 py-8 text-center text-destructive text-sm">
+						L’annuaire est momentanément indisponible. Réessayez dans un
+						instant.
+					</div>
+				) : (
+					<ComboboxEmpty>Aucun lycée trouvé.</ComboboxEmpty>
+				)}
+				<ComboboxList>
+					{(school: SchoolOption) => (
+						<ComboboxItem
+							key={school.uai}
+							value={school}
+							className="items-start py-2"
+						>
+							<SchoolIcon className="mt-0.5 text-muted-foreground" />
+							<span className="flex min-w-0 flex-1 flex-col">
+								<span className="truncate font-medium">{school.name}</span>
+								<span className="flex items-center gap-1 text-muted-foreground text-xs">
+									<MapPinIcon className="size-3" />
+									{school.city}
+									{school.postalCode ? ` · ${school.postalCode}` : ""}
+									{school.sector ? ` · ${school.sector}` : ""}
 								</span>
-								{value?.uai === school.uai ? (
-									<CheckIcon className="mt-0.5" />
-								) : null}
-							</CommandItem>
-						))}
-					</CommandList>
-				</Command>
-			</PopoverContent>
-		</Popover>
+							</span>
+						</ComboboxItem>
+					)}
+				</ComboboxList>
+			</ComboboxContent>
+		</Combobox>
 	);
 }

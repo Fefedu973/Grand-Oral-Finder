@@ -34,7 +34,10 @@ import {
 	type finderInputSchema,
 	normalizeCommissionCode,
 } from "../domain/grand-oral";
-import { analyzePivot, unsupportedPivotAnalysis } from "../domain/matching";
+import {
+	analyzeTemporalPivot,
+	unsupportedTemporalPivotAnalysis,
+} from "../domain/matching";
 import { hashClientIp, hashDeviceToken } from "../domain/privacy";
 import { publicProcedure } from "../index";
 
@@ -140,10 +143,16 @@ async function getDirectorySchool(db: Context["db"], uai: string) {
 async function calculatePrediction(
 	db: Context["db"],
 	input: FinderInput,
+	candidateExamAt: Date,
 	excludedSubmissionId?: string,
 ) {
+	const candidate = {
+		examAt: candidateExamAt,
+		subjectOne: input.subjectOne,
+		subjectTwo: input.subjectTwo,
+	};
 	if (input.track === "technological") {
-		return unsupportedPivotAnalysis(input.subjectOne, input.subjectTwo);
+		return unsupportedTemporalPivotAnalysis(candidate);
 	}
 
 	const normalizedCode = normalizeCommissionCode(input.commissionCode);
@@ -175,6 +184,7 @@ async function calculatePrediction(
 	const rows = sessions[0]
 		? await db
 				.select({
+					examAt: submission.examAt,
 					subjectOne: submission.subjectOne,
 					subjectTwo: submission.subjectTwo,
 				})
@@ -182,7 +192,7 @@ async function calculatePrediction(
 				.where(and(...filters))
 		: [];
 
-	return analyzePivot(rows, input.subjectOne, input.subjectTwo);
+	return analyzeTemporalPivot(rows, candidate);
 }
 
 const ownedSubmissionFields = {
@@ -267,6 +277,44 @@ export const appRouter = {
 					const accessKey = keyByHash.get(accessKeyHash);
 					return accessKey ? [{ ...row, accessKey }] : [];
 				});
+			}),
+		prediction: publicProcedure
+			.input(z.object({ accessKey: accessKeySchema }))
+			.handler(async ({ context, input }) => {
+				const rows = await context.db
+					.select(ownedSubmissionFields)
+					.from(submission)
+					.innerJoin(examSession, eq(submission.examSessionId, examSession.id))
+					.innerJoin(school, eq(examSession.schoolUai, school.uai))
+					.where(eq(submission.accessKeyHash, hashAccessKey(input.accessKey)))
+					.limit(1);
+				const row = rows[0];
+				if (!row) {
+					throw new ORPCError("NOT_FOUND", {
+						message: "Déclaration ou clé de récupération introuvable.",
+					});
+				}
+
+				const { accessKeyHash: _accessKeyHash, ...details } = row;
+				return {
+					submission: details,
+					prediction: await calculatePrediction(
+						context.db,
+						{
+							schoolUai: row.schoolUai,
+							examYear: row.examYear,
+							track: row.track as FinderInput["track"],
+							series: row.series,
+							commissionCode: row.commissionCode,
+							codeSource: row.codeSource as FinderInput["codeSource"],
+							examDay: row.examDay,
+							subjectOne: row.subjectOne,
+							subjectTwo: row.subjectTwo,
+						},
+						row.examAt,
+						row.id,
+					),
+				};
 			}),
 		create: publicProcedure
 			.input(
@@ -396,6 +444,7 @@ export const appRouter = {
 					prediction: await calculatePrediction(
 						context.db,
 						input.data,
+						new Date(input.data.examAt),
 						saved.id,
 					),
 				};
@@ -513,6 +562,7 @@ export const appRouter = {
 					prediction: await calculatePrediction(
 						context.db,
 						input.data,
+						new Date(input.data.examAt),
 						existingSubmission.id,
 					),
 				};

@@ -16,10 +16,13 @@
 	"dependencies": {
 		"@base-ui/react": "^1.6.0",
 		"@shadcn/react": "^0.2.0",
+		"canvas-confetti": "^1.9.4",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"cmdk": "^1.1.1",
+		"date-fns": "^4.4.0",
 		"lucide-react": "catalog:",
+		"react-day-picker": "^10.0.1",
 		"next-themes": "catalog:",
 		"react": "catalog:",
 		"react-dom": "catalog:",
@@ -30,6 +33,7 @@
 	},
 	"devDependencies": {
 		"@grand-oral-finder/config": "workspace:*",
+		"@types/canvas-confetti": "^1.9.0",
 		"@tailwindcss/postcss": "catalog:",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",

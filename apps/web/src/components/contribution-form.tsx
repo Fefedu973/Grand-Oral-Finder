@@ -4,8 +4,8 @@ import {
 	GENERAL_SPECIALTIES,
 	TECHNOLOGICAL_SERIES,
 } from "@grand-oral-finder/api/domain/grand-oral";
-import { Badge } from "@grand-oral-finder/ui/components/badge";
 import { Button } from "@grand-oral-finder/ui/components/button";
+import { Calendar } from "@grand-oral-finder/ui/components/calendar";
 import {
 	Dialog,
 	DialogContent,
@@ -15,6 +15,14 @@ import {
 	DialogTitle,
 } from "@grand-oral-finder/ui/components/dialog";
 import {
+	Drawer,
+	DrawerContent,
+	DrawerDescription,
+	DrawerFooter,
+	DrawerHeader,
+	DrawerTitle,
+} from "@grand-oral-finder/ui/components/drawer";
+import {
 	Field,
 	FieldDescription,
 	FieldError,
@@ -23,23 +31,45 @@ import {
 } from "@grand-oral-finder/ui/components/field";
 import { Input } from "@grand-oral-finder/ui/components/input";
 import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupInput,
+} from "@grand-oral-finder/ui/components/input-group";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@grand-oral-finder/ui/components/popover";
+import {
 	Select,
 	SelectContent,
+	SelectGroup,
 	SelectItem,
 	SelectTrigger,
+	SelectValue,
 } from "@grand-oral-finder/ui/components/select";
 import { Separator } from "@grand-oral-finder/ui/components/separator";
+import { Spinner } from "@grand-oral-finder/ui/components/spinner";
+import {
+	ToggleGroup,
+	ToggleGroupItem,
+} from "@grand-oral-finder/ui/components/toggle-group";
+import { useMediaQuery } from "@grand-oral-finder/ui/hooks/use-media-query";
 import { useForm } from "@tanstack/react-form";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 import {
 	ArrowRightIcon,
 	BarChart3Icon,
-	CheckCircle2Icon,
-	CopyIcon,
+	CalendarIcon,
+	ClockIcon,
+	HelpCircleIcon,
 	InfoIcon,
 	KeyRoundIcon,
 	SaveIcon,
 } from "lucide-react";
-import Link from "next/link";
+import type { Route } from "next";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -50,6 +80,7 @@ import {
 } from "@/lib/submission-access";
 import { client } from "@/utils/orpc";
 
+import { CopyButton, CopyInputGroupButton } from "./copy-button";
 import { SchoolCombobox, type SchoolOption } from "./school-combobox";
 
 const now = new Date();
@@ -90,10 +121,6 @@ const formSchema = z
 		path: ["series"],
 	});
 
-type Prediction = Awaited<
-	ReturnType<typeof client.submissions.create>
->["prediction"];
-
 export type ContributionDraft = {
 	accessKey?: string;
 	school: SchoolOption;
@@ -123,6 +150,16 @@ function splitDate(value?: string | Date, examDay?: string) {
 	};
 }
 
+function resultRoute(submissionId: string) {
+	return `/resultat?id=${encodeURIComponent(submissionId)}` as Route;
+}
+
+function parseDateValue(value: string): Date | undefined {
+	const [year, month, day] = value.split("-").map(Number);
+	if (!year || !month || !day) return undefined;
+	return new Date(year, month - 1, day);
+}
+
 export function ContributionForm({
 	initial,
 	mode = "contribute",
@@ -135,12 +172,14 @@ export function ContributionForm({
 	const [selectedSchool, setSelectedSchool] = useState<SchoolOption | null>(
 		initial?.school ?? null,
 	);
-	const [prediction, setPrediction] = useState<Prediction | null>(null);
+	const router = useRouter();
 	const [saving, setSaving] = useState(false);
+	const [datePickerOpen, setDatePickerOpen] = useState(false);
 	const [currentAccessKey, setCurrentAccessKey] = useState(
 		initial?.accessKey ?? null,
 	);
 	const [recoveryDialogOpen, setRecoveryDialogOpen] = useState(false);
+	const [pendingResultId, setPendingResultId] = useState<string | null>(null);
 
 	const form = useForm({
 		defaultValues: {
@@ -178,12 +217,14 @@ export function ContributionForm({
 
 			setSaving(true);
 			try {
-				let result: { prediction: Prediction };
 				if (currentAccessKey) {
-					result = await client.submissions.update({
+					const updated = await client.submissions.update({
 						accessKey: currentAccessKey,
 						data,
 					});
+					toast.success("Déclaration mise à jour.");
+					onSaved?.();
+					router.push(resultRoute(updated.id));
 				} else {
 					const created = await client.submissions.create({
 						deviceToken: getOrCreateDeviceToken(),
@@ -191,21 +232,15 @@ export function ContributionForm({
 					});
 					const stored = addSubmissionAccessKey(created.accessKey);
 					setCurrentAccessKey(created.accessKey);
+					setPendingResultId(created.id);
 					setRecoveryDialogOpen(true);
 					if (!stored) {
 						toast.warning(
 							"Le navigateur n’a pas pu enregistrer la clé. Copiez-la avant de fermer le dialogue.",
 						);
 					}
-					result = created;
+					toast.success("Déclaration enregistrée et ajoutée à l’estimation.");
 				}
-				setPrediction(result.prediction);
-				toast.success(
-					currentAccessKey
-						? "Déclaration mise à jour."
-						: "Déclaration enregistrée et ajoutée à l’estimation.",
-				);
-				if (mode === "save") onSaved?.();
 			} catch (error) {
 				toast.error(
 					error instanceof Error ? error.message : "Une erreur est survenue.",
@@ -216,10 +251,11 @@ export function ContributionForm({
 		},
 	});
 
-	async function copyAccessKey() {
-		if (!currentAccessKey) return;
-		await navigator.clipboard.writeText(currentAccessKey);
-		toast.success("Clé copiée.");
+	function closeRecoveryDialog(open: boolean) {
+		setRecoveryDialogOpen(open);
+		if (!open && pendingResultId) {
+			router.push(resultRoute(pendingResultId));
+		}
 	}
 
 	return (
@@ -246,7 +282,7 @@ export function ContributionForm({
 											invalid={invalid}
 											onChange={(school) => {
 												setSelectedSchool(school);
-												field.handleChange(school.uai);
+												field.handleChange(school?.uai ?? "");
 											}}
 										/>
 										<FieldDescription>
@@ -272,25 +308,27 @@ export function ContributionForm({
 												value && field.handleChange(Number(value))
 											}
 										>
-											<SelectTrigger className="h-10 w-full rounded-md text-sm">
-												<span>{field.state.value}</span>
+											<SelectTrigger className="w-full">
+												<SelectValue />
 											</SelectTrigger>
-											<SelectContent className="rounded-md">
-												{[
-													defaultExamYear + 1,
-													defaultExamYear,
-													defaultExamYear - 1,
-													defaultExamYear - 2,
-												]
-													.filter(
-														(value, index, values) =>
-															values.indexOf(value) === index,
-													)
-													.map((year) => (
-														<SelectItem key={year} value={String(year)}>
-															{year}
-														</SelectItem>
-													))}
+											<SelectContent>
+												<SelectGroup>
+													{[
+														defaultExamYear + 1,
+														defaultExamYear,
+														defaultExamYear - 1,
+														defaultExamYear - 2,
+													]
+														.filter(
+															(value, index, values) =>
+																values.indexOf(value) === index,
+														)
+														.map((year) => (
+															<SelectItem key={year} value={String(year)}>
+																{year}
+															</SelectItem>
+														))}
+												</SelectGroup>
 											</SelectContent>
 										</Select>
 									</Field>
@@ -301,28 +339,25 @@ export function ContributionForm({
 								{(field) => (
 									<Field>
 										<FieldLabel>Voie</FieldLabel>
-										<Select
-											value={field.state.value}
-											onValueChange={(value) => {
+										<ToggleGroup
+											variant="outline"
+											spacing={0}
+											className="w-full *:flex-1"
+											value={[field.state.value]}
+											onValueChange={(next) => {
+												const value = next[0];
 												if (value === "general" || value === "technological") {
 													field.handleChange(value);
 												}
 											}}
 										>
-											<SelectTrigger className="h-10 w-full rounded-md text-sm">
-												<span>
-													{field.state.value === "general"
-														? "Générale"
-														: "Technologique"}
-												</span>
-											</SelectTrigger>
-											<SelectContent className="rounded-md">
-												<SelectItem value="general">Générale</SelectItem>
-												<SelectItem value="technological">
-													Technologique
-												</SelectItem>
-											</SelectContent>
-										</Select>
+											<ToggleGroupItem value="general">
+												Générale
+											</ToggleGroupItem>
+											<ToggleGroupItem value="technological">
+												Technologique
+											</ToggleGroupItem>
+										</ToggleGroup>
 									</Field>
 								)}
 							</form.Field>
@@ -345,19 +380,19 @@ export function ContributionForm({
 														}
 													>
 														<SelectTrigger
-															className="h-10 w-full rounded-md text-sm"
+															className="w-full"
 															aria-invalid={invalid}
 														>
-															<span>
-																{field.state.value || "Sélectionner une série"}
-															</span>
+															<SelectValue placeholder="Sélectionner une série" />
 														</SelectTrigger>
-														<SelectContent className="rounded-md">
-															{TECHNOLOGICAL_SERIES.map((series) => (
-																<SelectItem key={series} value={series}>
-																	{series}
-																</SelectItem>
-															))}
+														<SelectContent>
+															<SelectGroup>
+																{TECHNOLOGICAL_SERIES.map((series) => (
+																	<SelectItem key={series} value={series}>
+																		{series}
+																	</SelectItem>
+																))}
+															</SelectGroup>
 														</SelectContent>
 													</Select>
 													{invalid ? (
@@ -389,7 +424,7 @@ export function ContributionForm({
 													field.handleChange(event.target.value)
 												}
 												placeholder="Ex. 0421 ou BCG10"
-												className="h-10 rounded-md text-sm uppercase"
+												className="uppercase"
 												aria-invalid={invalid}
 												autoComplete="off"
 											/>
@@ -409,30 +444,61 @@ export function ContributionForm({
 							<form.Field name="codeSource">
 								{(field) => (
 									<Field>
-										<FieldLabel>Origine du code</FieldLabel>
-										<Select
-											value={field.state.value}
-											onValueChange={(value) => {
-												if (value === "official" || value === "shared")
+										<div className="flex items-center gap-1">
+											<FieldLabel>Origine du code</FieldLabel>
+											<Popover>
+												<PopoverTrigger
+													render={
+														<Button
+															type="button"
+															variant="ghost"
+															size="icon-xs"
+															className="text-muted-foreground"
+															aria-label="Aide sur l’origine du code"
+														/>
+													}
+												>
+													<HelpCircleIcon />
+												</PopoverTrigger>
+												<PopoverContent
+													align="start"
+													className="w-80 text-sm leading-6"
+												>
+													<p>
+														<span className="font-medium">Convocation</span> :
+														votre convocation Cyclades affiche un numéro de
+														commission (ex. COM0421).
+													</p>
+													<p className="mt-2">
+														<span className="font-medium">Code partagé</span> :
+														aucun numéro n’apparaît ? Convenez d’un code avec
+														les candidats de votre groupe de passage. La
+														tendance ne fonctionne que si chacun saisit
+														exactement le même code et choisit aussi « Code
+														partagé ».
+													</p>
+												</PopoverContent>
+											</Popover>
+										</div>
+										<ToggleGroup
+											variant="outline"
+											spacing={0}
+											className="w-full *:flex-1"
+											value={[field.state.value]}
+											onValueChange={(next) => {
+												const value = next[0];
+												if (value === "official" || value === "shared") {
 													field.handleChange(value);
+												}
 											}}
 										>
-											<SelectTrigger className="h-10 w-full rounded-md text-sm">
-												<span>
-													{field.state.value === "official"
-														? "Convocation officielle"
-														: "Code partagé localement"}
-												</span>
-											</SelectTrigger>
-											<SelectContent className="rounded-md">
-												<SelectItem value="official">
-													Convocation officielle
-												</SelectItem>
-												<SelectItem value="shared">
-													Code partagé localement
-												</SelectItem>
-											</SelectContent>
-										</Select>
+											<ToggleGroupItem value="official">
+												Convocation
+											</ToggleGroupItem>
+											<ToggleGroupItem value="shared">
+												Code partagé
+											</ToggleGroupItem>
+										</ToggleGroup>
 									</Field>
 								)}
 							</form.Field>
@@ -440,36 +506,72 @@ export function ContributionForm({
 
 						<div className="grid gap-5 sm:grid-cols-2">
 							<form.Field name="examDate">
-								{(field) => (
-									<Field>
-										<FieldLabel htmlFor={field.name}>
-											Date de passage
-										</FieldLabel>
-										<Input
-											id={field.name}
-											type="date"
-											value={field.state.value}
-											onChange={(event) =>
-												field.handleChange(event.target.value)
-											}
-											className="h-10 rounded-md text-sm"
-										/>
-									</Field>
-								)}
+								{(field) => {
+									const selectedDate = parseDateValue(field.state.value);
+									return (
+										<Field>
+											<FieldLabel htmlFor="exam-date">
+												Date de passage
+											</FieldLabel>
+											<Popover
+												open={datePickerOpen}
+												onOpenChange={setDatePickerOpen}
+											>
+												<PopoverTrigger
+													render={
+														<Button
+															type="button"
+															id="exam-date"
+															variant="outline"
+															className="w-full justify-between font-normal"
+														/>
+													}
+												>
+													{selectedDate
+														? format(selectedDate, "d MMMM yyyy", {
+																locale: fr,
+															})
+														: "Choisir une date"}
+													<CalendarIcon className="text-muted-foreground" />
+												</PopoverTrigger>
+												<PopoverContent align="start" className="w-auto p-0">
+													<Calendar
+														mode="single"
+														locale={fr}
+														selected={selectedDate}
+														defaultMonth={selectedDate}
+														captionLayout="dropdown"
+														onSelect={(date) => {
+															if (date) {
+																field.handleChange(format(date, "yyyy-MM-dd"));
+															}
+															setDatePickerOpen(false);
+														}}
+													/>
+												</PopoverContent>
+											</Popover>
+										</Field>
+									);
+								}}
 							</form.Field>
 							<form.Field name="examTime">
 								{(field) => (
 									<Field>
 										<FieldLabel htmlFor={field.name}>Heure</FieldLabel>
-										<Input
-											id={field.name}
-											type="time"
-											value={field.state.value}
-											onChange={(event) =>
-												field.handleChange(event.target.value)
-											}
-											className="h-10 rounded-md text-sm"
-										/>
+										<InputGroup>
+											<InputGroupInput
+												id={field.name}
+												type="time"
+												value={field.state.value}
+												onChange={(event) =>
+													field.handleChange(event.target.value)
+												}
+												className="appearance-none [&::-webkit-calendar-picker-indicator]:hidden"
+											/>
+											<InputGroupAddon>
+												<ClockIcon />
+											</InputGroupAddon>
+										</InputGroup>
 									</Field>
 								)}
 							</form.Field>
@@ -500,23 +602,22 @@ export function ContributionForm({
 																	}
 																>
 																	<SelectTrigger
-																		className="h-10 w-full rounded-md text-sm"
+																		className="w-full"
 																		aria-invalid={invalid}
 																	>
-																		<span className="truncate">
-																			{field.state.value ||
-																				"Sélectionner une spécialité"}
-																		</span>
+																		<SelectValue placeholder="Sélectionner une spécialité" />
 																	</SelectTrigger>
-																	<SelectContent className="rounded-md">
-																		{GENERAL_SPECIALTIES.map((specialty) => (
-																			<SelectItem
-																				key={specialty}
-																				value={specialty}
-																			>
-																				{specialty}
-																			</SelectItem>
-																		))}
+																	<SelectContent>
+																		<SelectGroup>
+																			{GENERAL_SPECIALTIES.map((specialty) => (
+																				<SelectItem
+																					key={specialty}
+																					value={specialty}
+																				>
+																					{specialty}
+																				</SelectItem>
+																			))}
+																		</SelectGroup>
 																	</SelectContent>
 																</Select>
 															) : (
@@ -528,7 +629,6 @@ export function ContributionForm({
 																		field.handleChange(event.target.value)
 																	}
 																	placeholder="Intitulé court"
-																	className="h-10 rounded-md text-sm"
 																	aria-invalid={invalid}
 																/>
 															)}
@@ -545,70 +645,118 @@ export function ContributionForm({
 							)}
 						</form.Subscribe>
 
-						<div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center">
+						<Separator />
+
+						<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
 							<form.Subscribe
 								selector={(state) => ({
 									canSubmit: state.canSubmit,
 									isSubmitting: state.isSubmitting,
 								})}
 							>
-								{({ canSubmit, isSubmitting }) => (
-									<Button
-										type="submit"
-										size="lg"
-										className="h-10 rounded-md px-4 text-sm"
-										disabled={!canSubmit || isSubmitting || saving}
-									>
-										{mode === "save" ? <SaveIcon /> : <BarChart3Icon />}
-										{isSubmitting || saving
-											? "Traitement…"
-											: mode === "save"
-												? currentAccessKey
-													? "Mettre à jour"
-													: "Enregistrer"
-												: currentAccessKey
-													? "Mettre à jour l’analyse"
-													: "Contribuer et analyser"}
-									</Button>
-								)}
+								{({ canSubmit, isSubmitting }) => {
+									const pending = isSubmitting || saving;
+									return (
+										<Button
+											type="submit"
+											size="lg"
+											disabled={!canSubmit || pending}
+										>
+											{pending ? (
+												<Spinner data-icon="inline-start" />
+											) : mode === "save" ? (
+												<SaveIcon data-icon="inline-start" />
+											) : (
+												<BarChart3Icon data-icon="inline-start" />
+											)}
+											{pending
+												? "Traitement…"
+												: mode === "save"
+													? currentAccessKey
+														? "Mettre à jour"
+														: "Enregistrer"
+													: currentAccessKey
+														? "Mettre à jour l’analyse"
+														: "Contribuer et analyser"}
+										</Button>
+									);
+								}}
 							</form.Subscribe>
-							<p className="text-muted-foreground text-xs">
-								Aucun nom, email ou compte n’est demandé.
-							</p>
 						</div>
 					</FieldGroup>
 				</form>
 
 				<aside className="lg:border-l lg:pl-8">
-					{prediction ? (
-						<PredictionPanel prediction={prediction} />
-					) : (
-						<div className="sticky top-24 space-y-5">
-							<div className="flex size-10 items-center justify-center rounded-md bg-secondary">
-								<InfoIcon className="text-muted-foreground" />
-							</div>
-							<div>
-								<h2 className="font-semibold">Estimation collective</h2>
-								<p className="mt-2 text-muted-foreground text-sm leading-6">
-									Le calcul compare uniquement des candidats du même centre, de
-									la même session, du même jour et du même code de groupe.
-								</p>
-							</div>
-							<Separator />
-							<p className="text-muted-foreground text-xs leading-5">
-								L’outil cherche une spécialité pivot probable, pas la question
-								que le jury choisira. Certaines académies masquent aussi le
-								numéro de commission sur les convocations.
+					<div className="sticky top-24 flex flex-col gap-5">
+						<div className="flex size-10 items-center justify-center rounded-lg bg-secondary">
+							<InfoIcon className="size-4 text-muted-foreground" />
+						</div>
+						<div>
+							<h2 className="font-semibold">Estimation collective</h2>
+							<p className="mt-2 text-muted-foreground text-sm leading-6">
+								Le calcul compare uniquement des candidats du même centre, de la
+								même session, du même jour et du même code de groupe. Le
+								résultat s’ouvre sur une page dédiée dès l’enregistrement.
 							</p>
 						</div>
-					)}
+						<Separator />
+						<p className="text-muted-foreground text-xs leading-5">
+							L’outil cherche une spécialité pivot probable, pas la question que
+							le jury choisira. Certaines académies masquent aussi le numéro de
+							commission sur les convocations.
+						</p>
+					</div>
 				</aside>
 			</div>
 
-			<Dialog open={recoveryDialogOpen} onOpenChange={setRecoveryDialogOpen}>
-				<DialogContent className="rounded-md sm:max-w-md">
+			<RecoveryKeyDialog
+				accessKey={currentAccessKey}
+				open={recoveryDialogOpen}
+				onOpenChange={closeRecoveryDialog}
+			/>
+		</>
+	);
+}
+
+function RecoveryKeyDialog({
+	accessKey,
+	open,
+	onOpenChange,
+}: {
+	accessKey: string | null;
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+}) {
+	const isDesktop = useMediaQuery("(min-width: 768px)");
+	const details = (
+		<div className="grid gap-4">
+			<InputGroup>
+				<InputGroupInput
+					readOnly
+					value={accessKey ?? ""}
+					className="font-mono text-xs"
+					onFocus={(event) => event.target.select()}
+				/>
+				<InputGroupAddon align="inline-end">
+					<CopyInputGroupButton
+						value={accessKey ?? ""}
+						label="Copier la clé de récupération"
+					/>
+				</InputGroupAddon>
+			</InputGroup>
+			<p className="text-muted-foreground text-xs leading-5">
+				Nous ne connaissons pas cette clé et ne pourrons pas la renvoyer par
+				email. Toute personne qui la possède peut modifier la déclaration.
+			</p>
+		</div>
+	);
+
+	if (isDesktop) {
+		return (
+			<Dialog open={open} onOpenChange={onOpenChange}>
+				<DialogContent className="sm:max-w-md">
 					<DialogHeader>
-						<div className="mb-2 flex size-9 items-center justify-center rounded-md bg-secondary">
+						<div className="mb-2 flex size-9 items-center justify-center rounded-lg bg-secondary">
 							<KeyRoundIcon className="size-4" />
 						</div>
 						<DialogTitle>Conservez votre clé de récupération</DialogTitle>
@@ -617,141 +765,45 @@ export function ContributionForm({
 							et modifier votre déclaration depuis un autre appareil.
 						</DialogDescription>
 					</DialogHeader>
-					<div className="break-all rounded-md border bg-muted/50 p-3 font-mono text-sm">
-						{currentAccessKey}
-					</div>
-					<p className="text-muted-foreground text-xs leading-5">
-						Nous ne connaissons pas cette clé et ne pourrons pas la renvoyer par
-						email. Toute personne qui la possède peut modifier la déclaration.
-					</p>
+					{details}
 					<DialogFooter>
-						<Button
-							type="button"
-							variant="outline"
-							className="rounded-md"
-							onClick={copyAccessKey}
-						>
-							<CopyIcon />
+						<CopyButton value={accessKey ?? ""} variant="outline">
 							Copier la clé
-						</Button>
-						<Button
-							type="button"
-							className="rounded-md"
-							onClick={() => setRecoveryDialogOpen(false)}
-						>
-							J’ai compris
+						</CopyButton>
+						<Button type="button" onClick={() => onOpenChange(false)}>
+							Voir le résultat
+							<ArrowRightIcon data-icon="inline-end" />
 						</Button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
-		</>
-	);
-}
-
-function PredictionPanel({ prediction }: { prediction: Prediction }) {
-	const confidenceLabels = {
-		none: "Données insuffisantes",
-		low: "Indice faible",
-		medium: "Indice modéré",
-		high: "Indice plus solide",
-	} as const;
-	const statusMessages = {
-		"unsupported-track":
-			"L’organisation des commissions technologiques peut reposer sur une spécialité pivot ou sur deux spécialistes. Aucun pronostic fiable n’est produit pour cette voie.",
-		insufficient:
-			"Il faut au moins quatre autres déclarations du même groupe avant d’afficher une tendance.",
-		ambiguous:
-			"Les déclarations comparables ne départagent pas suffisamment vos deux spécialités.",
-		trend:
-			"La spécialité ci-dessous est la plus présente parmi les déclarations comparables.",
-	} as const;
-	const statusLabel =
-		prediction.status === "trend"
-			? confidenceLabels[prediction.confidence]
-			: prediction.status === "ambiguous"
-				? "Signal contradictoire"
-				: prediction.status === "unsupported-track"
-					? "Voie non prise en charge"
-					: "Données insuffisantes";
+		);
+	}
 
 	return (
-		<div className="sticky top-24 space-y-5" aria-live="polite">
-			<div className="flex items-center justify-between gap-3">
-				<div className="flex size-10 items-center justify-center rounded-md bg-secondary">
-					{prediction.likelyPivot ? (
-						<CheckCircle2Icon className="text-emerald-600 dark:text-emerald-400" />
-					) : (
-						<InfoIcon className="text-muted-foreground" />
-					)}
-				</div>
-				<Badge variant="secondary" className="rounded-md">
-					{statusLabel}
-				</Badge>
-			</div>
-
-			<div>
-				<p className="font-medium text-muted-foreground text-xs uppercase">
-					Spécialité pivot probable
-				</p>
-				<h2 className="mt-2 font-semibold text-xl leading-tight">
-					{prediction.likelyPivot ?? "Pas encore de tendance exploitable"}
-				</h2>
-				<p className="mt-2 text-muted-foreground text-sm leading-6">
-					{statusMessages[prediction.status]}
-				</p>
-				{prediction.status !== "unsupported-track" ? (
-					<p className="mt-2 text-muted-foreground text-xs leading-5">
-						{prediction.sampleSize} autre{prediction.sampleSize > 1 ? "s" : ""}{" "}
-						candidat{prediction.sampleSize > 1 ? "s" : ""} dans ce groupe
-						{prediction.outlierCount > 0
-							? `, dont ${prediction.outlierCount} sans spécialité commune avec votre paire.`
-							: "."}
-					</p>
-				) : null}
-			</div>
-
-			{prediction.sampleSize > 0 &&
-			prediction.status !== "unsupported-track" ? (
-				<div className="space-y-3">
-					{prediction.support.map((item) => (
-						<div key={item.subject}>
-							<div className="mb-1.5 flex items-center justify-between gap-4 text-xs">
-								<span className="truncate">{item.subject}</span>
-								<span className="font-mono text-muted-foreground">
-									{item.count}/{prediction.sampleSize}
-								</span>
-							</div>
-							<div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-								<div
-									className="h-full rounded-full bg-foreground transition-[width]"
-									style={{
-										width: `${Math.max(item.count > 0 ? 4 : 0, item.rate * 100)}%`,
-									}}
-								/>
-							</div>
-						</div>
-					))}
-				</div>
-			) : null}
-
-			<div className="border-t pt-4 text-muted-foreground text-xs leading-5">
-				Même avec un indice élevé, le jury choisit librement l’une de vos deux
-				questions, qui peut être transversale. Préparez toujours les deux.
-			</div>
-
-			<Button
-				render={
-					<Link
-						href="https://cyclades.education.gouv.fr/cyccandidat/portal/login"
-						target="_blank"
-					/>
-				}
-				variant="link"
-				className="h-auto justify-start p-0"
-			>
-				Ouvrir Cyclades
-				<ArrowRightIcon />
-			</Button>
-		</div>
+		<Drawer open={open} onOpenChange={onOpenChange}>
+			<DrawerContent>
+				<DrawerHeader className="text-left">
+					<div className="mb-2 flex size-9 items-center justify-center rounded-lg bg-secondary">
+						<KeyRoundIcon className="size-4" />
+					</div>
+					<DrawerTitle>Conservez votre clé de récupération</DrawerTitle>
+					<DrawerDescription>
+						Elle est enregistrée dans ce navigateur. Copiez-la pour retrouver et
+						modifier votre déclaration depuis un autre appareil.
+					</DrawerDescription>
+				</DrawerHeader>
+				<div className="px-4">{details}</div>
+				<DrawerFooter className="pt-2">
+					<Button type="button" onClick={() => onOpenChange(false)}>
+						Voir le résultat
+						<ArrowRightIcon data-icon="inline-end" />
+					</Button>
+					<CopyButton value={accessKey ?? ""} variant="outline">
+						Copier la clé
+					</CopyButton>
+				</DrawerFooter>
+			</DrawerContent>
+		</Drawer>
 	);
 }

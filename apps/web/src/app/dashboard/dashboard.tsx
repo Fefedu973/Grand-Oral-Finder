@@ -10,7 +10,17 @@ import {
 	AlertDialogTrigger,
 } from "@grand-oral-finder/ui/components/alert-dialog";
 import { Badge } from "@grand-oral-finder/ui/components/badge";
-import { Button } from "@grand-oral-finder/ui/components/button";
+import {
+	Button,
+	buttonVariants,
+} from "@grand-oral-finder/ui/components/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@grand-oral-finder/ui/components/card";
 import {
 	Dialog,
 	DialogContent,
@@ -18,16 +28,54 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@grand-oral-finder/ui/components/dialog";
-import { Input } from "@grand-oral-finder/ui/components/input";
+import {
+	Drawer,
+	DrawerClose,
+	DrawerContent,
+	DrawerDescription,
+	DrawerFooter,
+	DrawerHeader,
+	DrawerTitle,
+	DrawerTrigger,
+} from "@grand-oral-finder/ui/components/drawer";
+import {
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@grand-oral-finder/ui/components/empty";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupButton,
+	InputGroupInput,
+} from "@grand-oral-finder/ui/components/input-group";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemTitle,
+} from "@grand-oral-finder/ui/components/item";
 import { Skeleton } from "@grand-oral-finder/ui/components/skeleton";
+import { Spinner } from "@grand-oral-finder/ui/components/spinner";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@grand-oral-finder/ui/components/tooltip";
+import { useMediaQuery } from "@grand-oral-finder/ui/hooks/use-media-query";
 import { useQuery } from "@tanstack/react-query";
 import {
 	CalendarClockIcon,
-	CopyIcon,
 	Edit3Icon,
 	KeyRoundIcon,
 	PlusIcon,
 	Trash2Icon,
+	TrendingUpIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -37,6 +85,7 @@ import {
 	type ContributionDraft,
 	ContributionForm,
 } from "@/components/contribution-form";
+import { CopyButton } from "@/components/copy-button";
 import {
 	addSubmissionAccessKey,
 	formatSubmissionAccessKey,
@@ -130,73 +179,74 @@ export default function Dashboard() {
 
 	if (accessKeys === null || submissions.isLoading) {
 		return (
-			<div className="mt-10 grid gap-3">
-				<Skeleton className="h-24 w-full rounded-md" />
-				<Skeleton className="h-32 w-full rounded-md" />
+			<div className="mt-10 flex flex-col gap-3">
+				<Skeleton className="h-28 w-full" />
+				<Skeleton className="h-32 w-full" />
 			</div>
 		);
 	}
 
 	return (
 		<>
-			<section className="mt-8 grid gap-4 border-y py-5 md:grid-cols-[1fr_minmax(20rem,28rem)] md:items-center">
-				<div>
-					<div className="flex items-center gap-2 font-medium text-sm">
+			<Card className="mt-8">
+				<CardHeader>
+					<CardTitle className="flex items-center gap-2">
 						<KeyRoundIcon className="size-4" />
 						Importer une déclaration
-					</div>
-					<p className="mt-1 text-muted-foreground text-xs leading-5">
+					</CardTitle>
+					<CardDescription>
 						Utilisez la clé privée affichée lors de l’enregistrement pour
 						retrouver une déclaration sur cet appareil.
-					</p>
-				</div>
-				<form className="flex min-w-0 gap-2" onSubmit={importDeclaration}>
-					<Input
-						value={importKey}
-						onChange={(event) => setImportKey(event.target.value)}
-						placeholder="GOF-XXXX-XXXX-…"
-						className="h-9 min-w-0 rounded-md font-mono text-xs uppercase"
-						autoComplete="off"
-						spellCheck={false}
-					/>
-					<Button
-						type="submit"
-						variant="outline"
-						className="h-9 rounded-md"
-						disabled={importing || !importKey.trim()}
-					>
-						{importing ? "Import…" : "Importer"}
-					</Button>
-				</form>
-			</section>
+					</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<form onSubmit={importDeclaration}>
+						<InputGroup className="sm:max-w-md">
+							<InputGroupInput
+								value={importKey}
+								onChange={(event) => setImportKey(event.target.value)}
+								placeholder="GOF-XXXX-XXXX-…"
+								className="font-mono text-xs uppercase"
+								autoComplete="off"
+								spellCheck={false}
+							/>
+							<InputGroupAddon align="inline-end">
+								<InputGroupButton
+									type="submit"
+									variant="secondary"
+									disabled={importing || !importKey.trim()}
+								>
+									{importing ? <Spinner data-icon="inline-start" /> : null}
+									{importing ? "Import…" : "Importer"}
+								</InputGroupButton>
+							</InputGroupAddon>
+						</InputGroup>
+					</form>
+				</CardContent>
+			</Card>
 
 			{submissions.data?.length ? (
-				<div className="divide-y border-b">
+				<ItemGroup className="mt-6 gap-3">
 					{submissions.data.map((row) => (
-						<article
-							key={row.id}
-							className="grid gap-5 py-6 md:grid-cols-[1fr_auto] md:items-center"
-						>
-							<div className="min-w-0">
-								<div className="flex flex-wrap items-center gap-2">
-									<h2 className="truncate font-semibold">{row.schoolName}</h2>
-									<Badge variant="secondary" className="rounded-md">
-										{row.examYear}
-									</Badge>
-									<Badge variant="outline" className="rounded-md font-mono">
+						<Item key={row.id} variant="outline" className="p-4">
+							<ItemContent>
+								<ItemTitle className="flex-wrap">
+									{row.schoolName}
+									<Badge variant="secondary">{row.examYear}</Badge>
+									<Badge variant="outline" className="font-mono">
 										{row.commissionCode}
 									</Badge>
-								</div>
-								<p className="mt-1 text-muted-foreground text-sm">
+								</ItemTitle>
+								<ItemDescription>
 									{row.schoolCity} ·{" "}
 									{row.track === "general" ? "Voie générale" : row.series}
-								</p>
-								<p className="mt-3 text-sm">
+								</ItemDescription>
+								<p className="mt-2 text-sm">
 									{row.subjectOne}{" "}
 									<span className="text-muted-foreground">/</span>{" "}
 									{row.subjectTwo}
 								</p>
-								<p className="mt-2 text-muted-foreground text-xs">
+								<p className="mt-1 text-muted-foreground text-xs">
 									Passage le{" "}
 									{new Intl.DateTimeFormat("fr-FR", {
 										dateStyle: "long",
@@ -204,27 +254,30 @@ export default function Dashboard() {
 									}).format(new Date(row.examAt))}
 									{" · "}version {row.version}
 								</p>
-							</div>
-							<div className="flex items-center gap-2">
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									className="rounded-md"
-									onClick={async () => {
-										await navigator.clipboard.writeText(row.accessKey);
-										toast.success("Clé copiée.");
-									}}
+							</ItemContent>
+							<ItemActions className="self-start">
+								<Tooltip>
+									<TooltipTrigger
+										render={
+											<CopyButton
+												value={row.accessKey}
+												variant="ghost"
+												size="icon"
+												label="Copier la clé de récupération"
+											/>
+										}
+									/>
+									<TooltipContent>Copier la clé de récupération</TooltipContent>
+								</Tooltip>
+								<Link
+									href={{ pathname: "/resultat", query: { id: row.id } }}
+									className={buttonVariants({ variant: "outline" })}
 								>
-									<CopyIcon />
-									<span className="sr-only">Copier la clé de récupération</span>
-								</Button>
-								<Button
-									variant="outline"
-									className="rounded-md"
-									onClick={() => setEditing(row)}
-								>
-									<Edit3Icon />
+									<TrendingUpIcon data-icon="inline-start" />
+									Résultat
+								</Link>
+								<Button variant="outline" onClick={() => setEditing(row)}>
+									<Edit3Icon data-icon="inline-start" />
 									Modifier
 								</Button>
 								<DeleteButton
@@ -235,32 +288,66 @@ export default function Dashboard() {
 										await refresh();
 									}}
 								/>
-							</div>
-						</article>
+							</ItemActions>
+						</Item>
 					))}
-				</div>
+				</ItemGroup>
 			) : (
-				<section className="border-b py-14 text-center">
-					<CalendarClockIcon className="mx-auto size-8 text-muted-foreground" />
-					<h2 className="mt-5 font-semibold text-lg">
-						Aucune déclaration sur cet appareil
-					</h2>
-					<p className="mx-auto mt-2 max-w-md text-muted-foreground text-sm leading-6">
-						Lancez une recherche puis enregistrez-la, ou importez une clé de
-						récupération existante.
-					</p>
-					<Button render={<Link href="/" />} className="mt-6 rounded-md">
-						<PlusIcon />
-						Créer une déclaration
-					</Button>
-				</section>
+				<Empty className="mt-6 border border-dashed">
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<CalendarClockIcon />
+						</EmptyMedia>
+						<EmptyTitle>Aucune déclaration sur cet appareil</EmptyTitle>
+						<EmptyDescription>
+							Lancez une recherche puis enregistrez-la, ou importez une clé de
+							récupération existante.
+						</EmptyDescription>
+					</EmptyHeader>
+					<EmptyContent>
+						<Link href="/" className={buttonVariants()}>
+							<PlusIcon data-icon="inline-start" />
+							Créer une déclaration
+						</Link>
+					</EmptyContent>
+				</Empty>
 			)}
 
-			<Dialog
-				open={Boolean(editing)}
+			<EditDeclarationDialog
+				editing={editing}
 				onOpenChange={(open) => !open && setEditing(null)}
-			>
-				<DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto rounded-md sm:max-w-4xl">
+				onSaved={async () => {
+					setEditing(null);
+					await refresh();
+				}}
+			/>
+		</>
+	);
+}
+
+function EditDeclarationDialog({
+	editing,
+	onOpenChange,
+	onSaved,
+}: {
+	editing: SubmissionRow | null;
+	onOpenChange: (open: boolean) => void;
+	onSaved: () => Promise<void>;
+}) {
+	const isDesktop = useMediaQuery("(min-width: 768px)");
+	const form = editing ? (
+		<ContributionForm
+			key={editing.id}
+			mode="save"
+			initial={toDraft(editing)}
+			onSaved={onSaved}
+		/>
+	) : null;
+
+	if (isDesktop) {
+		return (
+			<Dialog open={Boolean(editing)} onOpenChange={onOpenChange}>
+				<DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-4xl">
 					<DialogHeader>
 						<DialogTitle>Modifier la déclaration</DialogTitle>
 						<DialogDescription>
@@ -268,20 +355,25 @@ export default function Dashboard() {
 							doublon.
 						</DialogDescription>
 					</DialogHeader>
-					{editing ? (
-						<ContributionForm
-							key={editing.id}
-							mode="save"
-							initial={toDraft(editing)}
-							onSaved={async () => {
-								setEditing(null);
-								await refresh();
-							}}
-						/>
-					) : null}
+					{form}
 				</DialogContent>
 			</Dialog>
-		</>
+		);
+	}
+
+	return (
+		<Drawer open={Boolean(editing)} onOpenChange={onOpenChange}>
+			<DrawerContent className="max-h-[calc(100dvh-1rem)]">
+				<DrawerHeader className="text-left">
+					<DrawerTitle>Modifier la déclaration</DrawerTitle>
+					<DrawerDescription>
+						L’enregistrement remplace la version précédente sans créer de
+						doublon.
+					</DrawerDescription>
+				</DrawerHeader>
+				<div className="flex-1 overflow-y-auto p-4">{form}</div>
+			</DrawerContent>
+		</Drawer>
 	);
 }
 
@@ -294,6 +386,7 @@ function DeleteButton({
 }) {
 	const [open, setOpen] = useState(false);
 	const [deleting, setDeleting] = useState(false);
+	const isDesktop = useMediaQuery("(min-width: 768px)");
 
 	async function remove() {
 		setDeleting(true);
@@ -311,40 +404,59 @@ function DeleteButton({
 		}
 	}
 
+	if (isDesktop) {
+		return (
+			<AlertDialog open={open} onOpenChange={setOpen}>
+				<AlertDialogTrigger render={<Button variant="ghost" size="icon" />}>
+					<Trash2Icon />
+					<span className="sr-only">Supprimer la déclaration</span>
+				</AlertDialogTrigger>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Supprimer cette déclaration ?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Elle ne sera plus comptabilisée dans les estimations. Cette action
+							est définitive.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<Button variant="outline" onClick={() => setOpen(false)}>
+							Annuler
+						</Button>
+						<Button variant="destructive" onClick={remove} disabled={deleting}>
+							{deleting ? <Spinner data-icon="inline-start" /> : null}
+							{deleting ? "Suppression…" : "Supprimer"}
+						</Button>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+		);
+	}
+
 	return (
-		<AlertDialog open={open} onOpenChange={setOpen}>
-			<AlertDialogTrigger
-				render={<Button variant="ghost" size="icon" className="rounded-md" />}
-			>
+		<Drawer open={open} onOpenChange={setOpen} disablePointerDismissal>
+			<DrawerTrigger render={<Button variant="ghost" size="icon" />}>
 				<Trash2Icon />
 				<span className="sr-only">Supprimer la déclaration</span>
-			</AlertDialogTrigger>
-			<AlertDialogContent className="rounded-md">
-				<AlertDialogHeader>
-					<AlertDialogTitle>Supprimer cette déclaration ?</AlertDialogTitle>
-					<AlertDialogDescription>
+			</DrawerTrigger>
+			<DrawerContent>
+				<DrawerHeader className="text-left">
+					<DrawerTitle>Supprimer cette déclaration ?</DrawerTitle>
+					<DrawerDescription>
 						Elle ne sera plus comptabilisée dans les estimations. Cette action
 						est définitive.
-					</AlertDialogDescription>
-				</AlertDialogHeader>
-				<AlertDialogFooter>
-					<Button
-						variant="outline"
-						className="rounded-md"
-						onClick={() => setOpen(false)}
-					>
-						Annuler
-					</Button>
-					<Button
-						variant="destructive"
-						className="rounded-md"
-						onClick={remove}
-						disabled={deleting}
-					>
+					</DrawerDescription>
+				</DrawerHeader>
+				<DrawerFooter className="pt-2">
+					<Button variant="destructive" onClick={remove} disabled={deleting}>
+						{deleting ? <Spinner data-icon="inline-start" /> : null}
 						{deleting ? "Suppression…" : "Supprimer"}
 					</Button>
-				</AlertDialogFooter>
-			</AlertDialogContent>
-		</AlertDialog>
+					<DrawerClose render={<Button variant="outline" />}>
+						Annuler
+					</DrawerClose>
+				</DrawerFooter>
+			</DrawerContent>
+		</Drawer>
 	);
 }
