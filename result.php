@@ -1,123 +1,229 @@
 <?php
-$servername = "localhost";
-$username = "root";
-$password = "1418";
-$dbname = "grand_oral";
+declare(strict_types=1);
 
-// Connexion à la base de données
-$conn = new mysqli($servername, $username, $password, $dbname);
+require __DIR__ . '/lib/database.php';
 
-// Vérifier la connexion
-if ($conn->connect_error) {
-    die("La connexion a échoué: " . $conn->connect_error);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    header('Allow: POST');
+    exit('Méthode non autorisée.');
 }
 
-// Récupérer les données du formulaire
-$numero_commission = intval($_POST['numéro_de_commission']);
-$specialite1 = $_POST['spécialitée1'];
-$specialite2 = $_POST['spécialitée2'];
-$date = $_POST['date'];
-$contact = $_POST['contact'];
+const SPECIALITIES = [
+    'Mathématiques',
+    'Physique-Chimie',
+    'Sciences de la vie et de la Terre',
+    "Sciences de l'ingénieur",
+    'Numérique et sciences informatiques',
+    'Sciences économiques et sociales',
+    'Histoire-Géographie, Géopolitique et Sciences politiques',
+    'Humanités, littérature et philosophie',
+    'Langues, littératures et cultures étrangères',
+    'Arts',
+    "Littérature, langues et cultures de l'Antiquité",
+    'Sports: Education Physique, pratique et culture sportives',
+    'Ecologie, Agronomie et Territoires (lycée agricole uniquement)',
+];
 
-$date_formatted = date('Y-m-d H:i:s', strtotime($date));
-$date_only = date('Y-m-d', strtotime($date));
+function text_field(string $name): string
+{
+    return trim((string) ($_POST[$name] ?? ''));
+}
 
-// Vérifier si le numéro de commission existe déjà
-$sql = "SELECT specialite1, specialite2, date_passage, contact FROM commissions WHERE numero_commission = ?";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $numero_commission);
-$stmt->execute();
-$result = $stmt->get_result();
+function html(string|int|null $value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
 
-$exists = false;
-$match_found = false;
-$specialites = [];
-
-// Récupérer les spécialités existantes
-while ($row = $result->fetch_assoc()) {
-    $exists = true;
-    $specialites[] = [$row['specialite1'], $row['specialite2']];
-    
-    // Vérifier si les spécialités correspondent
-    if (
-        $specialite1 === $row['specialite1'] &&
-        $specialite2 === $row['specialite2'] &&
-        $date_formatted === $row['date_passage'] &&
-        $contact === $row['contact']
-    ) {
-        $match_found = true;
-        echo "Vous avez déjà entré ces données, mode consultation <br><br>";
-        break;
+function env_flag(string $name, bool $default = false): bool
+{
+    $value = getenv($name);
+    if ($value === false || $value === '') {
+        return $default;
     }
+
+    return filter_var($value, FILTER_VALIDATE_BOOL);
 }
 
-$stmt->close();
+$commissionInput = text_field('numéro_de_commission');
+$speciality1 = text_field('spécialitée1');
+$speciality2 = text_field('spécialitée2');
+$dateInput = text_field('date');
+$contact = mb_substr(strip_tags(text_field('contact')), 0, 255);
+$errors = [];
 
-if (!$match_found) {
-    // Ajouter une nouvelle ligne car les spécialités ne correspondent pas ou la commission n'existe pas
-    $sql = "INSERT INTO commissions (numero_commission, specialite1, specialite2, date_passage, contact) VALUES (?, ?, ?, ?, ?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("issss", $numero_commission, $specialite1, $specialite2, $date_formatted, $contact);
-    if ($stmt->execute()) {
-        if ($exists) {
-            echo "D'autres personnes ont trouvé déjà entré le même numéro de commission, vos données ont également été ajoutées<br>";
-        } else {
-            echo "Le numéro de commission n'a jamais été entré auparavant. Les données ont été ajoutées. Veuillez réessayer ultérieurement pour voir si de nouvelles données sont entrées<br>";
+if (!preg_match('/^\d{4}$/', $commissionInput)) {
+    $errors[] = 'Le numéro de commission doit contenir exactement quatre chiffres.';
+}
+if (!in_array($speciality1, SPECIALITIES, true) || !in_array($speciality2, SPECIALITIES, true)) {
+    $errors[] = 'Une spécialité sélectionnée est invalide.';
+}
+if ($speciality1 === $speciality2) {
+    $errors[] = 'Les deux spécialités doivent être différentes.';
+}
+if ($contact === '') {
+    $errors[] = 'Le contact est obligatoire.';
+}
+
+$date = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', $dateInput);
+$dateErrors = DateTimeImmutable::getLastErrors();
+if (
+    $date === false ||
+    ($dateErrors !== false && ($dateErrors['warning_count'] > 0 || $dateErrors['error_count'] > 0))
+) {
+    $errors[] = 'La date et l’heure de passage sont invalides.';
+}
+
+if ($errors !== []) {
+    http_response_code(422);
+    render_page($errors, [], 0, false, $dateInput, false);
+    exit;
+}
+
+$commission = (int) $commissionInput;
+$formattedDate = $date->format('Y-m-d H:i:s');
+$acceptSubmissions = env_flag('APP_ACCEPT_SUBMISSIONS');
+$showContacts = env_flag('SHOW_CONTACTS');
+$messages = [];
+
+try {
+    $database = database();
+
+    $existing = $database->prepare(
+        'SELECT specialite1, specialite2, date_passage, contact FROM commissions WHERE numero_commission = ?'
+    );
+    $existing->bind_param('i', $commission);
+    $existing->execute();
+    $existingResult = $existing->get_result();
+    $hasCommission = $existingResult->num_rows > 0;
+    $exactMatch = false;
+
+    while ($row = $existingResult->fetch_assoc()) {
+        if (
+            $speciality1 === $row['specialite1'] &&
+            $speciality2 === $row['specialite2'] &&
+            $formattedDate === $row['date_passage'] &&
+            $contact === $row['contact']
+        ) {
+            $exactMatch = true;
+            break;
         }
+    }
+    $existing->close();
+
+    if ($exactMatch) {
+        $messages[] = 'Ces informations existent déjà : consultation des résultats.';
+    } elseif ($acceptSubmissions) {
+        $insert = $database->prepare(
+            'INSERT INTO commissions (numero_commission, specialite1, specialite2, date_passage, contact) VALUES (?, ?, ?, ?, ?)'
+        );
+        $insert->bind_param('issss', $commission, $speciality1, $speciality2, $formattedDate, $contact);
+        $insert->execute();
+        $insert->close();
+        $messages[] = $hasCommission
+            ? 'Les informations ont été ajoutées aux données déjà présentes pour cette commission.'
+            : 'Cette commission était inconnue. Les informations ont été ajoutées.';
     } else {
-        echo "Erreur lors de l'ajout des données : " . $stmt->error;
+        $messages[] = 'Cette copie est en lecture seule : aucune nouvelle donnée n’a été enregistrée.';
     }
-    $stmt->close();
+
+    $query = $database->prepare(
+        'SELECT numero_commission, specialite1, specialite2, date_passage, contact FROM commissions WHERE numero_commission = ? ORDER BY date_passage, id'
+    );
+    $query->bind_param('i', $commission);
+    $query->execute();
+    $rows = $query->get_result()->fetch_all(MYSQLI_ASSOC);
+    $query->close();
+
+    $totalResult = $database->query('SELECT COUNT(*) AS total FROM commissions');
+    $total = (int) $totalResult->fetch_assoc()['total'];
+    $database->close();
+
+    render_page($messages, $rows, $total, $showContacts, $date->format('Y-m-d'), true);
+} catch (Throwable $error) {
+    error_log('Grand Oral database error: ' . $error->getMessage());
+    http_response_code(503);
+    render_page(
+        ['Le service de recherche est temporairement indisponible. Réessayez ultérieurement.'],
+        [],
+        0,
+        false,
+        $date->format('Y-m-d'),
+        false,
+    );
 }
 
-$sql = "SELECT * FROM commissions WHERE numero_commission = ?";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $numero_commission);
-$stmt->execute();
-$result = $stmt->get_result();
+function render_page(
+    array $messages,
+    array $rows,
+    int $total,
+    bool $showContacts,
+    string $selectedDate,
+    bool $showExplanation,
+): void {
+    $count = count($rows);
+    ?>
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Résultats | Grand Oral Finder</title>
+    <style>
+        :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+        body { max-width: 72rem; margin: 0 auto; padding: 2rem 1rem 4rem; line-height: 1.55; }
+        a { color: inherit; }
+        .notice { padding: .75rem 1rem; margin: 0 0 .75rem; border: 1px solid currentColor; border-radius: .4rem; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
+        th, td { padding: .65rem; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); text-align: left; }
+        tr.same-day { background: #fff3a3; color: #171717; }
+    </style>
+</head>
+<body>
+    <p><a href="./">← Modifier les informations</a></p>
+    <h1>Résultats</h1>
+    <?php foreach ($messages as $message): ?>
+        <p class="notice"><?= html($message) ?></p>
+    <?php endforeach; ?>
 
-if ($result->num_rows > 0) {
-    echo "<table border='1'>";
-    echo "<tr><th>Numéro de commission</th><th>Spécialité 1</th><th>Spécialité 2</th><th>Date de Passage</th><th>Contact</th></tr>";
-    while ($row = $result->fetch_assoc()) {
-        $row_date_only = date('Y-m-d', strtotime($row['date_passage']));
-        $highlight = ($row_date_only === $date_only) ? 'style="background-color: yellow;"' : '';
-        
-        echo "<tr $highlight>";
-        echo "<td>" . htmlspecialchars($row['numero_commission']) . "</td>";
-        echo "<td>" . htmlspecialchars($row['specialite1']) . "</td>";
-        echo "<td>" . htmlspecialchars($row['specialite2']) . "</td>";
-        echo "<td>" . htmlspecialchars($row['date_passage']) . "</td>";
-        echo "<td>" . htmlspecialchars($row['contact']) . "</td>";
-        echo "</tr>";
-    }
-    echo "</table>";
-} else {
-    echo "Aucune donnée trouvée pour la commission $numero_commission.<br>";
+    <?php if ($rows !== []): ?>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Commission</th>
+                        <th>Spécialité 1</th>
+                        <th>Spécialité 2</th>
+                        <th>Date de passage</th>
+                        <?php if ($showContacts): ?><th>Contact</th><?php endif; ?>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($rows as $row): ?>
+                        <?php $sameDay = substr((string) $row['date_passage'], 0, 10) === $selectedDate; ?>
+                        <tr<?= $sameDay ? ' class="same-day"' : '' ?>>
+                            <td><?= html($row['numero_commission']) ?></td>
+                            <td><?= html($row['specialite1']) ?></td>
+                            <td><?= html($row['specialite2']) ?></td>
+                            <td><?= html($row['date_passage']) ?></td>
+                            <?php if ($showContacts): ?><td><?= html($row['contact']) ?></td><?php endif; ?>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <p><?= $count ?> résultat<?= $count > 1 ? 's' : '' ?> pour cette commission, parmi <?= $total ?> entrées.</p>
+    <?php else: ?>
+        <p>Aucune donnée trouvée pour cette commission.</p>
+    <?php endif; ?>
+
+    <?php if ($showExplanation): ?>
+        <h2>Comment interpréter les résultats ?</h2>
+        <p>Les lignes sur fond jaune correspondent à la date de passage saisie. Les informations proviennent d’autres utilisateurs et ne sont pas vérifiées.</p>
+        <p>Ces résultats restent des estimations : préparez vos deux sujets indépendamment de cette recherche.</p>
+    <?php endif; ?>
+</body>
+</html>
+    <?php
 }
-
-//ajouter un texte qui dit X données affichées parmis Y total de données
-// Compter le nombre total de commissions
-$sql_total = "SELECT COUNT(*) AS total FROM commissions";
-$result_total = $conn->query($sql_total);
-$row_total = $result_total->fetch_assoc();
-$total_commissions = $row_total['total'];
-// Compter le nombre de commissions pour le numéro donné
-$sql_count = "SELECT COUNT(*) AS count FROM commissions WHERE numero_commission = ?";
-$stmt_count = $conn->prepare($sql_count);
-$stmt_count->bind_param("i", $numero_commission);
-$stmt_count->execute();
-$result_count = $stmt_count->get_result();
-$row_count = $result_count->fetch_assoc();
-$count_commissions = $row_count['count'];
-echo "<p>$count_commissions commissions en commun trouvées parmis $total_commissions données entrées</p>";
-
-
-echo "<br><p>Comment interpréter les résultats ?</p>";
-echo "<p>Les données qui correspondent à votre comission sont affichées dans un tableau ci-dessus. Les lignes avec un fond jaune indiquent que la date de passage est la même que celle que vous avez entrée.</p>";
-echo "<p>Les spécialités que vous voyez dans le tableau sont celles qui ont été entrées par d'autres personnes pour la même commission.</p>";
-echo "<p>C'est à vous de décider si vous souhaitez prendre en compte ces données pour votre propre commission et comment les interpréter (Exemple: si vous passez à la même heure et avec la même commission que quelqu'un dont la seule spé en commun est maths par exemple alors vous pouvez assez vite deviner que le professeur du jury est un prof de maths et que vous serez interrogé sur votre sujet de maths). En sachant que nous ne savons pas si les comissions changent dans la même journée</p>";
-echo "<p>ATTENTION : Les données sont affichées ont été entrées par d'autres personnes et ne sont pas vérifiées.</p>";
-
-$conn->close();
-?>

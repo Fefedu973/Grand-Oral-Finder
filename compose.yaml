@@ -1,0 +1,54 @@
+services:
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      APP_ACCEPT_SUBMISSIONS: ${APP_ACCEPT_SUBMISSIONS:-false}
+      SHOW_CONTACTS: ${SHOW_CONTACTS:-false}
+      DB_HOST: database
+      DB_PORT: 3306
+      DB_NAME: grand_oral
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+      - /var/run/apache2:size=4m,uid=33,gid=33,mode=0755
+      - /var/lock/apache2:size=4m,uid=33,gid=33,mode=0755
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - default
+      - database
+
+  database:
+    image: mariadb:10.11@sha256:be981e4113326ada8d6004174dd09eeaefc03094037f811182a52d4f2e737350
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: grand_oral
+      MARIADB_USER: ${DB_USER:?DB_USER is required}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    volumes:
+      - grand-oral-database:/var/lib/mysql
+    networks:
+      - database
+
+networks:
+  database:
+    internal: true
+
+volumes:
+  grand-oral-database:

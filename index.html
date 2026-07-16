@@ -1,4 +1,4 @@
-<html lang="en">
+<html lang="fr">
 
 <head>
     <meta charset="UTF-8">
@@ -14,11 +14,11 @@
             var contact = localStorage.getItem("contact");
 
             // Réinsérer les valeurs dans les champs du formulaire
-            document.getElementById("spécialitée1").value = spec1;
-            document.getElementById("spécialitée2").value = spec2;
-            document.getElementById("numéro_de_commission").value = numero_commission;
-            document.getElementById("date").value = date;
-            document.getElementById("contact").value = contact;
+            if (spec1) document.getElementById("spécialitée1").value = spec1;
+            if (spec2) document.getElementById("spécialitée2").value = spec2;
+            if (numero_commission) document.getElementById("numéro_de_commission").value = numero_commission;
+            if (date) document.getElementById("date").value = date;
+            if (contact) document.getElementById("contact").value = contact;
         });
         function validateForm() {
             var spec1 = document.getElementById("spécialitée1").value;
@@ -70,7 +70,7 @@
             href="https://cyclades.education.gouv.fr/cyccandidat/portal/login"> espace cyclades.</a> Cliquer sur la
         session du bac 2024 puis sur mes documents et télécharger le PDF "Convocation (5 épreuves). Le numéro de
         commission se trouve dans la section Grand oral en bas (voir image)</p>
-    <img style="height:400px" src="convoc.png">
+    <img style="height:400px;max-width:100%;object-fit:contain" src="convoc.png" alt="Exemple de convocation avec le numéro de commission">
     <br>
     <br>
     <h2>Entrez les informations demandées pour connaître votre sujet de grand oral:</h2>
@@ -119,7 +119,7 @@
         </select>
         <br><br>
         <label for="numéro_de_commission">Numéro de commission (sans COM):</label>
-        <input type="number" id="numéro_de_commission" name="numéro_de_commission" required>
+        <input type="text" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" id="numéro_de_commission" name="numéro_de_commission" required>
         <br><br>
         <label for="date">Date de passage METTRE LA BONNE HEURE PLUSIEURS PERSONNES ONT LAISSE L'HEURE PAR DEFAULT
             !!!:</label>
@@ -128,6 +128,7 @@
         <label for="contact">Contact (pour mettre en relation les élèves pour plus de précisions) (ex: mail, instagram
             etc) ET POUR QUE L'ADMIN PUISSE VOUS CONTACTER EN CAS DE PROBLEME/FORMULAIRE MAL REMPLI:</label>
         <input type="text" id="contact" name="contact" required />
+        <p>Le contact est enregistré avec la contribution. Cette copie migrée ne l’affiche pas publiquement par défaut.</p>
         <br>
         <br>
         <input type="submit" value="Soumettre et Rechercher">
