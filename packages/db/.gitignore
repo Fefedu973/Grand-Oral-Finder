@@ -28,6 +28,11 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .cache
 *.tsbuildinfo
 
+# local SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
 # IntelliJ based IDEs
 .idea
 

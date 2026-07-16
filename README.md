@@ -1,124 +1,128 @@
-# grand-oral-finder
+# Grand Oral Finder
 
-This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines Next.js, Hono, ORPC, and more.
+Application participative qui estime la spécialité pivot probable d’une commission du Grand oral à partir de déclarations concordantes. Le produit ne prétend pas connaître la question choisie par le jury et refuse d’afficher une tendance lorsque les données sont trop faibles ou ambiguës.
 
-## Features
+## Stack
 
-- **TypeScript** - For type safety and improved developer experience
-- **Next.js** - Full-stack React framework
-- **TailwindCSS** - Utility-first CSS for rapid UI development
-- **Shared UI package** - shadcn/ui primitives live in `packages/ui`
-- **Hono** - Lightweight, performant server framework
-- **oRPC** - End-to-end type-safe APIs with OpenAPI integration
-- **Bun** - Runtime environment
-- **Drizzle** - TypeScript-first ORM
-- **PostgreSQL** - Database engine
-- **Authentication** - Better-Auth
-- **Turborepo** - Optimized monorepo build system
-- **Biome** - Linting and formatting
+- Next.js 16 et React 19 pour l’application web ;
+- Hono et oRPC pour l’API typée ;
+- Drizzle ORM et SQLite/libSQL pour la base ;
+- TanStack Form, Zod et les composants shadcn/ui ;
+- Bun, Turborepo et Biome.
 
-## Getting Started
+L’ancienne application PHP reste archivée dans `legacy/php`. Ses données historiques ne sont pas importées dans la nouvelle base.
 
-First, install the dependencies:
+## Démarrage local
 
 ```bash
 bun install
 ```
 
-## Database Setup
+Copier les exemples d’environnement si les fichiers locaux n’existent pas :
 
-This project uses PostgreSQL with Drizzle ORM.
-
-1. Make sure you have a PostgreSQL database set up.
-2. Update your `apps/server/.env` file with your PostgreSQL connection details.
-
-3. Apply the schema to your database:
-
-```bash
-bun run db:push
+```text
+apps/server/.env.example -> apps/server/.env
+apps/web/.env.example    -> apps/web/.env
 ```
 
-Then, run the development server:
+Créer la base locale et appliquer les migrations :
+
+```bash
+bun run db:migrate
+```
+
+Lancer le web et l’API :
 
 ```bash
 bun run dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
-The API is running at [http://localhost:3000](http://localhost:3000).
+- Web : <http://localhost:3001>
+- API : <http://localhost:3000>
 
-## UI Customization
+## Base de données
 
-React web apps in this stack share shadcn/ui primitives through `packages/ui`.
-
-- Change design tokens and global styles in `packages/ui/src/styles/globals.css`
-- Update shared primitives in `packages/ui/src/components/*`
-- Adjust shadcn aliases or style config in `packages/ui/components.json` and `apps/web/components.json`
-
-### Add more shared components
-
-Run this from the project root to add more primitives to the shared UI package:
+En développement, `DATABASE_URL=file:./packages/db/local.db` crée un fichier SQLite ignoré par Git. Les commandes locales sont lancées depuis la racine du monorepo afin que ce chemin reste stable. En production, le compose utilise `file:/data/grand-oral.db` sur un volume persistant.
 
 ```bash
-npx shadcn@latest add accordion dialog popover sheet table -c packages/ui
+bun run db:generate  # générer une migration après un changement de schéma
+bun run db:migrate   # appliquer les migrations
+bun run db:studio    # ouvrir Drizzle Studio
 ```
 
-Import shared components like this:
+Drizzle Studio est une interface locale de développement. Il ne doit pas être exposé publiquement en production.
 
-```tsx
-import { Button } from "@grand-oral-finder/ui/components/button";
+Pour remplir la base locale avec les états de démonstration, voir [docs/test-scenarios.md](docs/test-scenarios.md) :
+
+```bash
+bun run db:seed:test
 ```
 
-### Add app-specific blocks
+## Logique de rapprochement
 
-If you want to add app-specific blocks instead of shared primitives, run the shadcn CLI from `apps/web`.
+Une recherche ne compare que les déclarations ayant les mêmes éléments :
 
-## Deployment
+1. centre d’examen (UAI) ;
+2. session et voie ;
+3. jour de passage ;
+4. origine du code, officielle ou partagée ;
+5. code de commission normalisé.
 
-### Docker Compose
+La déclaration courante est exclue de son propre calcul. Une tendance requiert au moins quatre autres contributions et deux voix d’écart. Les niveaux de confiance tiennent ensuite compte du nombre de pairs, du taux de présence de la spécialité dominante, de la marge et des déclarations incohérentes.
 
-- Target: web + server
-- Config: `docker-compose.yml` (app Dockerfiles live in `apps/*/Dockerfile`)
-- Build images: bun run docker:build
-- Start: bun run docker:up
-- Logs: bun run docker:logs
-- Stop: bun run docker:down
+La voie technologique est enregistrable, mais ne produit pas de pronostic : son organisation peut utiliser une spécialité pivot ou deux spécialistes selon le paramétrage académique.
 
-Environment variables are read from each app's `.env` file (baked into web builds for public variables) and overridden in `docker-compose.yml` for container networking.
+Le détail et les justifications sont dans [docs/matching-methodology.md](docs/matching-methodology.md).
 
-For more details, see the guide on [Deploying with Docker Compose](https://www.better-t-stack.dev/docs/guides/docker).
+## Accès et anti-abus
 
-## Git Hooks and Formatting
+L’application ne demande ni compte, ni email, ni mot de passe. La première contribution génère une clé de récupération aléatoire de 160 bits :
 
-- Run checks: `bun run check`
+- la clé brute reste dans le navigateur et peut être copiée vers un autre appareil ;
+- seul son hash SHA-256 est stocké dans SQLite ;
+- cette clé est obligatoire pour lire, modifier ou supprimer la déclaration ;
+- aucune récupération par email n’est possible si la clé est perdue.
 
-## Project Structure
+Une estimation n’est renvoyée qu’après création ou modification de la contribution concernée. Il n’existe pas d’endpoint public permettant d’énumérer librement les groupes. Les résultats sont des agrégats de la cohorte exacte et restent insuffisants sous quatre autres contributions.
 
+Les garde-fous persistants sont :
+
+- une déclaration par navigateur et par session d’examen ;
+- trois créations maximum par empreinte IP sur 24 heures ;
+- douze modifications maximum par déclaration sur 24 heures ;
+- au moins cinq secondes entre deux modifications.
+
+Les événements de création pseudonymisés sont conservés sept jours puis purgés automatiquement. Ils permettent au quota de rester effectif même si une déclaration est supprimée.
+
+Une unicité stricte par IP n’est volontairement pas utilisée : plusieurs candidats peuvent partager l’IP d’un lycée, d’un foyer ou d’un opérateur mobile. L’IP n’est jamais stockée en clair ; une empreinte HMAC-SHA-256 est calculée avec `IP_HASH_SECRET`. Le jeton aléatoire du navigateur est lui aussi stocké uniquement sous forme de hash.
+
+## Données externes
+
+La recherche d’établissements utilise l’[Annuaire de l’Éducation nationale](https://data.education.gouv.fr/explore/dataset/fr-en-annuaire-education/). Les réponses sont mises en cache en mémoire pendant 30 minutes ; les établissements déjà sélectionnés servent de repli local si le service public est momentanément indisponible.
+
+## Vérifications
+
+```bash
+bun test
+bun run check-types
+bun run build
 ```
-grand-oral-finder/
-├── apps/
-│   ├── web/         # Frontend application (Next.js)
-│   └── server/      # Backend API (Hono, ORPC)
-├── packages/
-│   ├── ui/          # Shared shadcn/ui components and styles
-│   ├── api/         # API layer / business logic
-│   ├── auth/        # Authentication configuration & logic
-│   └── db/          # Database schema & queries
+
+## Docker et Dokploy
+
+Le compose démarre deux services : `web` et `server`. Le serveur applique les migrations Drizzle avant de démarrer.
+
+```bash
+bun run docker:up
+bun run docker:logs
+bun run docker:down
 ```
 
-## Available Scripts
+En production :
 
-- `bun run dev`: Start all applications in development mode
-- `bun run build`: Build all applications
-- `bun run dev:web`: Start only the web application
-- `bun run dev:server`: Start only the server
-- `bun run check-types`: Check TypeScript types across all apps
-- `bun run db:push`: Push schema changes to database
-- `bun run db:generate`: Generate database client/types
-- `bun run db:migrate`: Run database migrations
-- `bun run db:studio`: Open database studio UI
-- `bun run check`: Run Biome formatting and linting
-- `bun run docker:build`: Build the Docker Compose images
-- `bun run docker:up`: Build and start the Docker Compose stack
-- `bun run docker:logs`: Tail logs from the Docker Compose stack
-- `bun run docker:down`: Stop the Docker Compose stack
+- monter un volume persistant sur `/data` ;
+- fournir un `IP_HASH_SECRET` aléatoire d’au moins 32 caractères ;
+- renseigner les URL publiques réelles dans `CORS_ORIGIN` et `NEXT_PUBLIC_SERVER_URL` ;
+- sauvegarder régulièrement le volume SQLite avec une stratégie cohérente avec le journal WAL.
+
+Dans Dokploy, `NEXT_PUBLIC_SERVER_URL` doit être disponible pendant le build du service web, car Next.js l’intègre au bundle client. Ne conservez pas la valeur locale par défaut de `IP_HASH_SECRET` en production.

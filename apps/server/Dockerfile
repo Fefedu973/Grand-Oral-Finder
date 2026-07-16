@@ -13,4 +13,4 @@ ENV SKIP_ENV_VALIDATION=
 EXPOSE 3000
 
 WORKDIR /app/apps/server
-CMD ["bun", "dist/index.mjs"]
+CMD ["sh", "-c", "bun --cwd /app/packages/db db:migrate && exec bun dist/index.mjs"]

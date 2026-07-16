@@ -1,3 +1,3 @@
 {
-  "extends": "@grand-oral-finder/config/tsconfig.base.json"
+	"extends": "@grand-oral-finder/config/tsconfig.base.json"
 }

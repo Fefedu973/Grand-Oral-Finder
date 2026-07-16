@@ -1,0 +1,371 @@
+{
+	"version": "6",
+	"dialect": "sqlite",
+	"id": "75237a88-3109-46dd-a03d-22851581080b",
+	"prevId": "00000000-0000-0000-0000-000000000000",
+	"tables": {
+		"exam_session": {
+			"name": "exam_session",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"school_uai": {
+					"name": "school_uai",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"exam_year": {
+					"name": "exam_year",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"track": {
+					"name": "track",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"series": {
+					"name": "series",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "''"
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'open'"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsecond') * 1000 as integer))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsecond') * 1000 as integer))"
+				}
+			},
+			"indexes": {
+				"exam_session_school_year_track_unique": {
+					"name": "exam_session_school_year_track_unique",
+					"columns": ["school_uai", "exam_year", "track", "series"],
+					"isUnique": true
+				},
+				"exam_session_year_idx": {
+					"name": "exam_session_year_idx",
+					"columns": ["exam_year"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"exam_session_school_uai_school_uai_fk": {
+					"name": "exam_session_school_uai_school_uai_fk",
+					"tableFrom": "exam_session",
+					"tableTo": "school",
+					"columnsFrom": ["school_uai"],
+					"columnsTo": ["uai"],
+					"onDelete": "restrict",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"rate_limit_event": {
+			"name": "rate_limit_event",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"fingerprint": {
+					"name": "fingerprint",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"action": {
+					"name": "action",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsecond') * 1000 as integer))"
+				}
+			},
+			"indexes": {
+				"rate_limit_event_lookup_idx": {
+					"name": "rate_limit_event_lookup_idx",
+					"columns": ["action", "fingerprint", "created_at"],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"school": {
+			"name": "school",
+			"columns": {
+				"uai": {
+					"name": "uai",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"city": {
+					"name": "city",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"postal_code": {
+					"name": "postal_code",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"academy": {
+					"name": "academy",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"sector": {
+					"name": "sector",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsecond') * 1000 as integer))"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"submission": {
+			"name": "submission",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"access_key_hash": {
+					"name": "access_key_hash",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"device_hash": {
+					"name": "device_hash",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"exam_session_id": {
+					"name": "exam_session_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"commission_code": {
+					"name": "commission_code",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"code_source": {
+					"name": "code_source",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'official'"
+				},
+				"exam_day": {
+					"name": "exam_day",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"exam_at": {
+					"name": "exam_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"subject_one": {
+					"name": "subject_one",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"subject_two": {
+					"name": "subject_two",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"version": {
+					"name": "version",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": 1
+				},
+				"edit_window_started_at": {
+					"name": "edit_window_started_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsecond') * 1000 as integer))"
+				},
+				"edit_count": {
+					"name": "edit_count",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": 0
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsecond') * 1000 as integer))"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "(cast(unixepoch('subsecond') * 1000 as integer))"
+				}
+			},
+			"indexes": {
+				"submission_access_key_hash_unique": {
+					"name": "submission_access_key_hash_unique",
+					"columns": ["access_key_hash"],
+					"isUnique": true
+				},
+				"submission_device_session_unique": {
+					"name": "submission_device_session_unique",
+					"columns": ["device_hash", "exam_session_id"],
+					"isUnique": true
+				},
+				"submission_session_idx": {
+					"name": "submission_session_idx",
+					"columns": ["exam_session_id"],
+					"isUnique": false
+				},
+				"submission_lookup_idx": {
+					"name": "submission_lookup_idx",
+					"columns": [
+						"exam_session_id",
+						"exam_day",
+						"code_source",
+						"commission_code"
+					],
+					"isUnique": false
+				}
+			},
+			"foreignKeys": {
+				"submission_exam_session_id_exam_session_id_fk": {
+					"name": "submission_exam_session_id_exam_session_id_fk",
+					"tableFrom": "submission",
+					"tableTo": "exam_session",
+					"columnsFrom": ["exam_session_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		}
+	},
+	"views": {},
+	"enums": {},
+	"_meta": {
+		"schemas": {},
+		"tables": {},
+		"columns": {}
+	},
+	"internal": {
+		"indexes": {}
+	}
+}

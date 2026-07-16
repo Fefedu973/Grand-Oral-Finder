@@ -1,18 +1,28 @@
-import { auth } from "@grand-oral-finder/auth";
+import { db } from "@grand-oral-finder/db";
 import type { Context as HonoContext } from "hono";
 
 export type CreateContextOptions = {
-  context: HonoContext;
+	context: HonoContext;
 };
 
-export async function createContext({ context }: CreateContextOptions) {
-  const session = await auth.api.getSession({
-    headers: context.req.raw.headers,
-  });
-  return {
-    auth: null,
-    session,
-  };
-}
+type Database = Omit<typeof db, "$client">;
 
-export type Context = Awaited<ReturnType<typeof createContext>>;
+export type Context = {
+	db: Database;
+	clientIp: string;
+};
+
+export function createContext({ context }: CreateContextOptions): Context {
+	const forwardedFor = context.req
+		.header("x-forwarded-for")
+		?.split(",")[0]
+		?.trim();
+	return {
+		db,
+		clientIp:
+			forwardedFor ||
+			context.req.header("cf-connecting-ip") ||
+			context.req.header("x-real-ip") ||
+			"unknown",
+	};
+}

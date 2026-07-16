@@ -1,10 +1,14 @@
 import { env } from "@grand-oral-finder/env/server";
-import { drizzle } from "drizzle-orm/node-postgres";
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
 
 import * as schema from "./schema";
 
+export * from "./schema";
+
 export function createDb() {
-  return drizzle(env.DATABASE_URL, { schema });
+	const client = createClient({ url: env.DATABASE_URL });
+	return drizzle({ client, schema });
 }
 
 export const db = createDb();

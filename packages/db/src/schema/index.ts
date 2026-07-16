@@ -1,2 +1,1 @@
-export * from "./auth";
-export {};
+export * from "./grand-oral";

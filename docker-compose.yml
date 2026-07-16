@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        NEXT_PUBLIC_SERVER_URL: http://localhost:3000
+        NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:-http://localhost:3000}
     init: true
     ports:
       - "3001:3001"
@@ -14,7 +14,7 @@ services:
       - path: apps/web/.env
         required: false
     environment:
-      NEXT_PUBLIC_SERVER_URL: http://server:3000
+      NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:-http://localhost:3000}
     depends_on:
       server:
         condition: service_healthy
@@ -43,8 +43,11 @@ services:
       - path: apps/server/.env
         required: false
     environment:
-      CORS_ORIGIN: http://localhost:3001
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/grand-oral-finder
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
+      DATABASE_URL: file:/data/grand-oral.db
+      IP_HASH_SECRET: ${IP_HASH_SECRET:-local-compose-only-change-before-production-2026}
+    volumes:
+      - grand-oral-data:/data
     healthcheck:
       test:
         [
@@ -57,28 +60,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:18
-    container_name: grand-oral-finder-postgres
-    environment:
-      POSTGRES_DB: grand-oral-finder
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-    ports:
-      - "5432:5432"
-    volumes:
-      - grand-oral-finder_postgres_data:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: unless-stopped
 
 volumes:
-  grand-oral-finder_postgres_data:
+  grand-oral-data:
