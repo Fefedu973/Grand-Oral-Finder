@@ -110,13 +110,12 @@ bun run build
 
 ## Docker et Dokploy
 
-Le compose local `docker-compose.yml` démarre `web` et `server` avec des ports publiés sur la machine. En production, le projet Dokploy `Grand Oral Finder` contient trois ressources séparées :
+Le compose local `docker-compose.yml` démarre `web` et `server` avec des ports publiés sur la machine. En production, le projet Dokploy `Grand Oral Finder` contient deux ressources séparées :
 
 - `Grand Oral Finder`, le compose applicatif `compose.yaml` qui contient le frontend Next.js `web` et l'API Hono/oRPC `api` ;
-- `Grand Oral Finder Database`, un service libSQL natif Dokploy qui conserve la base SQLite dans son propre volume ;
-- `Grand Oral Finder Gateway`, le compose `compose.gateway.yaml` qui contient Drizzle Gateway et son adaptateur privé Bearer-vers-Basic.
+- `Grand Oral Finder Database`, un service libSQL natif Dokploy qui conserve la base SQLite dans son propre volume.
 
-L'API applique les migrations Drizzle avant de démarrer. Aucun port de base de données n'est publié : les trois ressources communiquent uniquement par `dokploy-network`. Traefik expose le web, l'API et l'interface Gateway, cette dernière restant protégée par son passcode.
+L'API applique les migrations Drizzle avant de démarrer. Aucun port de base de données n'est publié : l'application et libSQL communiquent uniquement par `dokploy-network`. L'administration passe par le compose raw `Database Gateway` du projet Dokploy `Infrastructure`, commun aux bases de production et protégé par son passcode. Le dépôt ne contient donc pas de Gateway propre à Grand Oral Finder.
 
 ```bash
 bun run docker:up
@@ -128,7 +127,7 @@ En production :
 
 - créer une base libSQL primaire avec un volume persistant et sans port externe ;
 - fournir un `IP_HASH_SECRET` aléatoire d’au moins 32 caractères ;
-- fournir un `DRIZZLE_GATEWAY_MASTERPASS` fort et ne pas exposer Gateway sans contrôle d’accès ;
+- enregistrer la base dans le `Database Gateway` central sans publier directement le port libSQL ;
 - renseigner les URL publiques réelles dans `CORS_ORIGIN` et `NEXT_PUBLIC_SERVER_URL` ;
 - sauvegarder régulièrement le volume libSQL et tester une restauration.
 
