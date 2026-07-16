@@ -1,0 +1,10 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+*.sql
+*.sql.gz
+*.tsv
+backups
+README.md

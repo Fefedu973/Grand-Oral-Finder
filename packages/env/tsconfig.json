@@ -1,0 +1,3 @@
+{
+  "extends": "@grand-oral-finder/config/tsconfig.base.json"
+}
