@@ -1,0 +1,52 @@
+x-runtime-defaults: &runtime-defaults
+  init: true
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+  networks:
+    - dokploy-network
+
+services:
+  libsql-auth-adapter:
+    <<: *runtime-defaults
+    build:
+      context: ./deploy/drizzle-gateway
+    environment:
+      GATEWAY_ADAPTER_TOKEN: ${GATEWAY_ADAPTER_TOKEN:?GATEWAY_ADAPTER_TOKEN is required}
+      LIBSQL_BASIC_AUTH: ${LIBSQL_BASIC_AUTH:?LIBSQL_BASIC_AUTH is required}
+      LIBSQL_HOST: ${LIBSQL_HOST:?LIBSQL_HOST is required}
+    expose:
+      - "8080"
+    read_only: true
+    tmpfs:
+      - /tmp:size=8m,mode=1777
+      - /var/cache/nginx:size=8m,mode=1777
+      - /var/run:size=1m,mode=1777
+
+  drizzle-gateway:
+    <<: *runtime-defaults
+    image: ghcr.io/drizzle-team/gateway@sha256:ca4ef620699e045567bfb56c2a6bfe6b105e8b40aed58ba9297944b7591413c5
+    depends_on:
+      - libsql-auth-adapter
+    environment:
+      DATABASE_AUTH_TOKEN_GRAND_ORAL_FINDER: ${GATEWAY_ADAPTER_TOKEN:?GATEWAY_ADAPTER_TOKEN is required}
+      DATABASE_URL_GRAND_ORAL_FINDER: http://libsql-auth-adapter:8080
+      MASTERPASS: ${DRIZZLE_GATEWAY_MASTERPASS:?DRIZZLE_GATEWAY_MASTERPASS is required}
+      PORT: "4983"
+      STORE_PATH: /app
+    expose:
+      - "4983"
+    volumes:
+      - drizzle-gateway-data:/app
+
+volumes:
+  drizzle-gateway-data:
+
+networks:
+  dokploy-network:
+    external: true

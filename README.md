@@ -42,7 +42,7 @@ bun run dev
 
 ## Base de données
 
-En développement, `DATABASE_URL=file:./packages/db/local.db` crée un fichier SQLite ignoré par Git. Les commandes locales sont lancées depuis la racine du monorepo afin que ce chemin reste stable. En production, le compose utilise `file:/data/grand-oral.db` sur un volume persistant.
+En développement, `DATABASE_URL=file:./packages/db/local.db` crée un fichier SQLite ignoré par Git. Les commandes locales sont lancées depuis la racine du monorepo afin que ce chemin reste stable. En production, l'API utilise un service libSQL auto-hébergé et privé sur le réseau Dokploy.
 
 ```bash
 bun run db:generate  # générer une migration après un changement de schéma
@@ -110,13 +110,13 @@ bun run build
 
 ## Docker et Dokploy
 
-Le compose local `docker-compose.yml` démarre `web` et `server` avec des ports publiés sur la machine. Le compose de production `compose.yaml` est destiné à Dokploy et regroupe trois services sous une seule application Compose :
+Le compose local `docker-compose.yml` démarre `web` et `server` avec des ports publiés sur la machine. En production, le projet Dokploy `Grand Oral Finder` contient trois ressources séparées :
 
-- `web`, le frontend Next.js sur le port interne 3001 ;
-- `server`, l’API Hono/oRPC sur le port interne 3000 ;
-- `drizzle-gateway`, l’interface d’administration protégée sur le port interne 4983.
+- `Grand Oral Finder`, le compose applicatif `compose.yaml` qui contient le frontend Next.js `web` et l'API Hono/oRPC `api` ;
+- `Grand Oral Finder Database`, un service libSQL natif Dokploy qui conserve la base SQLite dans son propre volume ;
+- `Grand Oral Finder Gateway`, le compose `compose.gateway.yaml` qui contient Drizzle Gateway et son adaptateur privé Bearer-vers-Basic.
 
-Le serveur applique les migrations Drizzle avant de démarrer. SQLite et la configuration de Drizzle Gateway utilisent des volumes persistants distincts. Aucun port hôte n’est publié par le compose de production : Dokploy et Traefik assurent seuls le routage public.
+L'API applique les migrations Drizzle avant de démarrer. Aucun port de base de données n'est publié : les trois ressources communiquent uniquement par `dokploy-network`. Traefik expose le web, l'API et l'interface Gateway, cette dernière restant protégée par son passcode.
 
 ```bash
 bun run docker:up
@@ -126,12 +126,12 @@ bun run docker:down
 
 En production :
 
-- monter un volume persistant sur `/data` ;
+- créer une base libSQL primaire avec un volume persistant et sans port externe ;
 - fournir un `IP_HASH_SECRET` aléatoire d’au moins 32 caractères ;
 - fournir un `DRIZZLE_GATEWAY_MASTERPASS` fort et ne pas exposer Gateway sans contrôle d’accès ;
 - renseigner les URL publiques réelles dans `CORS_ORIGIN` et `NEXT_PUBLIC_SERVER_URL` ;
-- sauvegarder régulièrement le volume SQLite avec une stratégie cohérente avec le journal WAL.
+- sauvegarder régulièrement le volume libSQL et tester une restauration.
 
 Dans Dokploy, `NEXT_PUBLIC_SERVER_URL` doit être disponible pendant le build du service web, car Next.js l’intègre au bundle client. Ne conservez pas la valeur locale par défaut de `IP_HASH_SECRET` en production.
 
-Dokploy ne propose pas de sous-dossiers de services dans un projet. La hiérarchie recommandée est `Websites` → `production` → un Compose par site. Le Compose joue donc le rôle d’unité de regroupement pour tous les services propres à Grand Oral Finder.
+Dokploy ne propose pas de sous-dossiers arbitraires. La hiérarchie retenue est donc un projet dédié `Grand Oral Finder` → `production` → les trois ressources ci-dessus, comme pour OpenBacktest.
