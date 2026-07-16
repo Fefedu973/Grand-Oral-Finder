@@ -1,0 +1,90 @@
+name: grand-oral-finder
+
+x-runtime-defaults: &runtime-defaults
+  init: true
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+services:
+  web:
+    <<: *runtime-defaults
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:?NEXT_PUBLIC_SERVER_URL is required}
+    environment:
+      NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:?NEXT_PUBLIC_SERVER_URL is required}
+    depends_on:
+      server:
+        condition: service_healthy
+    expose:
+      - "3001"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3001/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+
+  server:
+    <<: *runtime-defaults
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    environment:
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
+      DATABASE_URL: file:/data/grand-oral.db
+      IP_HASH_SECRET: ${IP_HASH_SECRET:?IP_HASH_SECRET is required}
+      NODE_ENV: production
+    expose:
+      - "3000"
+    volumes:
+      - grand-oral-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+
+  drizzle-gateway:
+    <<: *runtime-defaults
+    image: ghcr.io/drizzle-team/gateway@sha256:ca4ef620699e045567bfb56c2a6bfe6b105e8b40aed58ba9297944b7591413c5
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      DATABASE_URL_GRAND_ORAL_FINDER: file:/data/grand-oral.db
+      MASTERPASS: ${DRIZZLE_GATEWAY_MASTERPASS:?DRIZZLE_GATEWAY_MASTERPASS is required}
+      PORT: "4983"
+      STORE_PATH: /app
+    expose:
+      - "4983"
+    volumes:
+      - grand-oral-data:/data
+      - drizzle-gateway-data:/app
+
+volumes:
+  grand-oral-data:
+  drizzle-gateway-data:

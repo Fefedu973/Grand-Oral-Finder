@@ -110,7 +110,13 @@ bun run build
 
 ## Docker et Dokploy
 
-Le compose démarre deux services : `web` et `server`. Le serveur applique les migrations Drizzle avant de démarrer.
+Le compose local `docker-compose.yml` démarre `web` et `server` avec des ports publiés sur la machine. Le compose de production `compose.yaml` est destiné à Dokploy et regroupe trois services sous une seule application Compose :
+
+- `web`, le frontend Next.js sur le port interne 3001 ;
+- `server`, l’API Hono/oRPC sur le port interne 3000 ;
+- `drizzle-gateway`, l’interface d’administration protégée sur le port interne 4983.
+
+Le serveur applique les migrations Drizzle avant de démarrer. SQLite et la configuration de Drizzle Gateway utilisent des volumes persistants distincts. Aucun port hôte n’est publié par le compose de production : Dokploy et Traefik assurent seuls le routage public.
 
 ```bash
 bun run docker:up
@@ -122,7 +128,10 @@ En production :
 
 - monter un volume persistant sur `/data` ;
 - fournir un `IP_HASH_SECRET` aléatoire d’au moins 32 caractères ;
+- fournir un `DRIZZLE_GATEWAY_MASTERPASS` fort et ne pas exposer Gateway sans contrôle d’accès ;
 - renseigner les URL publiques réelles dans `CORS_ORIGIN` et `NEXT_PUBLIC_SERVER_URL` ;
 - sauvegarder régulièrement le volume SQLite avec une stratégie cohérente avec le journal WAL.
 
 Dans Dokploy, `NEXT_PUBLIC_SERVER_URL` doit être disponible pendant le build du service web, car Next.js l’intègre au bundle client. Ne conservez pas la valeur locale par défaut de `IP_HASH_SECRET` en production.
+
+Dokploy ne propose pas de sous-dossiers de services dans un projet. La hiérarchie recommandée est `Websites` → `production` → un Compose par site. Le Compose joue donc le rôle d’unité de regroupement pour tous les services propres à Grand Oral Finder.
