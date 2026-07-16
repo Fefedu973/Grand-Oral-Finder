@@ -43,7 +43,6 @@ services:
       start_period: 30s
     volumes:
       - grand-oral-database:/var/lib/mysql
-      - ${DB_MIGRATION_BACKUP:?DB_MIGRATION_BACKUP is required}:/migration/grand-oral.sql.gz:ro
     networks:
       - database
 
