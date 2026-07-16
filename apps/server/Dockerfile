@@ -1,7 +1,8 @@
-FROM node:24-slim AS base
-COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+FROM oven/bun:1.3.14-alpine AS base
 WORKDIR /app
 ENV SKIP_ENV_VALIDATION=1
+
+RUN apk add --no-cache libc6-compat
 
 COPY . .
 RUN --mount=type=cache,target=/root/.bun/install/cache bun install
