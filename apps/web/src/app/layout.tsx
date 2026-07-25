@@ -36,6 +36,18 @@ export default function RootLayout({
 			suppressHydrationWarning
 			className={cn("font-sans", inter.variable, geistMono.variable)}
 		>
+			<head>
+				<script
+					defer
+					src="https://analytics.fefe-du-973.fr/script.js"
+					data-website-id="4866a1b7-fc77-4045-8c0c-0c330780b63d"
+					data-domains="grandoral.fefe-du-973.fr"
+					data-do-not-track="true"
+					data-exclude-search="true"
+					data-exclude-hash="true"
+					data-performance="true"
+				/>
+			</head>
 			<body className="antialiased">
 				<Providers>
 					<div className="flex min-h-svh flex-col">
