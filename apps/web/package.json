@@ -28,7 +28,7 @@
     "date-fns": "^4.4.0",
     "dotenv": "catalog:",
     "lucide-react": "catalog:",
-    "next": "16.4.4",
+    "next": "16.4.6",
     "next-themes": "catalog:",
     "react": "catalog:",
     "react-day-picker": "^10.0.1",
